@@ -20,8 +20,23 @@ Runs the agent in the foreground. Ctrl-C (or SIGTERM) stops every session and ex
 | `--claude` | `claude` | Executable to run for every session (name on `PATH` or full path) |
 | `--token-file` | `<config dir>/clawsh/agent.token` | Bearer token file, created on first run |
 | `--scrollback` | `2097152` (2 MiB) | Bytes of output kept per session for replay |
+| `--env-file` | `<config dir>/clawsh/agent.env` | `KEY=VALUE` lines (`#` comments and blank lines allowed) set in the agent's environment, which sessions inherit. A missing file is an error only if you pass the flag |
+| `--detach` | off | Re-run the agent detached from the terminal (no console on Windows), log to `agent.log`, and exit |
 
 The executable is fixed here. The API only lets clients add arguments, never choose what runs.
+
+### `clawsh agent install-service`
+
+Installs the agent as a per-user login service; see [Installation](Installation.md#recommended-setup-run-the-agent-as-a-service).
+
+| Flag | Default | |
+|---|---|---|
+| `--listen` | `:7420` | Address the service's agent listens on |
+| `--claude` | `claude` | Executable, resolved to an absolute path now; fails if not found |
+| `--uninstall` | off | Stop and remove the service |
+| `--dry-run` | off | Print the files and commands without running anything |
+
+Linux: `~/.config/systemd/user/clawsh-agent.service`, enabled with `systemctl --user`. macOS: `~/Library/LaunchAgents/dev.clawsh.agent.plist`, loaded with `launchctl`, logs to `agent.log`. Windows: scheduled task `clawsh-agent` at logon.
 
 ### `clawsh token`
 

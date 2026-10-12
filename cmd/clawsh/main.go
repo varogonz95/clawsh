@@ -34,6 +34,7 @@ import (
 	"github.com/varogonz95/clawsh/internal/api"
 	"github.com/varogonz95/clawsh/internal/hub"
 	"github.com/varogonz95/clawsh/internal/mcp"
+	"github.com/varogonz95/clawsh/internal/paths"
 	"github.com/varogonz95/clawsh/internal/web"
 )
 
@@ -83,6 +84,9 @@ func usage() {
 
 agent side (run on each machine):
   agent [--listen :7420] [--claude claude] [--token-file path] [--scrollback bytes]
+        [--env-file path] [--detach]
+  agent install-service [--uninstall] [--dry-run] [--listen :7420] [--claude claude]
+                                     run the agent at login as a per-user service
   token [--token-file path]
   mcp [--listen :7420] [--claude claude] [--token-file path] [--log-file path]
       [--no-spawn] [--no-announce]
@@ -105,12 +109,26 @@ hub commands accept --config (default: `+hub.DefaultConfigPath()+`)
 // ---------- agent side ----------
 
 func runAgent(args []string) error {
+	if len(args) > 0 && args[0] == "install-service" {
+		return runInstallService(args[1:])
+	}
 	fs := flag.NewFlagSet("agent", flag.ExitOnError)
 	listen := fs.String("listen", ":7420", "address to listen on")
 	claude := fs.String("claude", "claude", "claude executable (name on PATH or full path)")
 	tokenFile := fs.String("token-file", agent.DefaultTokenPath(), "bearer token file (created on first run)")
 	scrollback := fs.Int("scrollback", 2<<20, "bytes of output kept per session for replay")
+	envFile := fs.String("env-file", paths.DefaultEnvFile(), "KEY=VALUE file applied to the agent's environment (sessions inherit it)")
+	detach := fs.Bool("detach", false, "re-run detached from this terminal and exit")
 	_ = fs.Parse(args)
+
+	if *detach {
+		return detachAgent(args)
+	}
+	explicit := false
+	fs.Visit(func(f *flag.Flag) { explicit = explicit || f.Name == "env-file" })
+	if err := agent.ApplyEnvFile(*envFile, explicit); err != nil {
+		return fmt.Errorf("env-file: %w", err)
+	}
 
 	token, created, err := agent.LoadOrCreateToken(*tokenFile)
 	if err != nil {

@@ -30,3 +30,6 @@ func configDir(base string) string {
 	}
 	return dir
 }
+
+// DefaultEnvFile is the agent's optional environment file.
+func DefaultEnvFile() string { return filepath.Join(ConfigDir(), "agent.env") }

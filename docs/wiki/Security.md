@@ -12,7 +12,7 @@
 
 - **Traffic is plain HTTP.** Tokens and terminal contents cross the network unencrypted. Keep agents on a trusted LAN until TLS or Tailscale support lands (see [Roadmap](Roadmap.md)).
 - `/v1/health` is open and reveals hostname, OS and version.
-- The agent listens on all interfaces by default. Use `--listen 192.168.1.20:7420` (or a VPN address) to narrow it.
+- The agent listens on all interfaces by default. Use `--listen 192.168.1.20:7420` (or a VPN address) to narrow it. `clawsh agent install-service --listen 127.0.0.1:7420` does the same for the login service, and is recommended when only this machine uses the agent.
 
 ## Rotating a token
 

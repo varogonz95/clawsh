@@ -16,6 +16,7 @@ import (
 
 	"github.com/varogonz95/clawsh/internal/agent"
 	"github.com/varogonz95/clawsh/internal/api"
+	"github.com/varogonz95/clawsh/internal/detach"
 	"github.com/varogonz95/clawsh/internal/hub"
 )
 
@@ -162,7 +163,7 @@ func spawn(o Options) error {
 	cmd.Dir, _ = os.UserHomeDir() // don't pin the project dir (Windows locks cwd)
 	cmd.Env = agentEnv(os.Environ())
 	cmd.Stdout, cmd.Stderr = logf, logf
-	if err := startDetached(cmd); err != nil {
+	if err := detach.Start(cmd); err != nil {
 		return err
 	}
 	log.Printf("spawned agent pid %d (log: %s)", cmd.Process.Pid, o.LogFile)

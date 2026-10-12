@@ -103,3 +103,18 @@ Machines that host sessions also need Claude Code installed, with `claude` on th
 **Windows:** the first time `clawsh agent` runs, allow `clawsh.exe` through Windows Defender Firewall for private networks.
 
 Next: [Quick start](Quick-Start.md).
+
+## Recommended setup: run the agent as a service
+
+On each machine that hosts sessions, install the agent as a per-user service so it starts at login and is restarted on crash (Linux and macOS):
+
+```
+clawsh agent install-service
+```
+
+It resolves `claude` and `clawsh` to absolute paths, writes a systemd user unit (Linux), a LaunchAgent (macOS) or a logon scheduled task (Windows), starts it, and prints the token for `hosts.toml`. Re-running it is safe. On first run it creates `<config dir>/clawsh/agent.env` holding your current `PATH`; edit it to add variables sessions should inherit. It is never overwritten.
+
+- Use `--listen 127.0.0.1:7420` if only this machine needs the agent; the default `:7420` is reachable from other machines.
+- Linux: on a headless machine run `loginctl enable-linger $USER`, or the agent stops when you log out.
+- Windows: the task starts the agent at logon without a console window. It is not restarted if it crashes.
+- `clawsh agent install-service --dry-run` prints what would be written and run. `--uninstall` stops and removes the service.

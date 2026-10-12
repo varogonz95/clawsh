@@ -18,7 +18,7 @@ Goal: one terminal on any PC shows every Claude Code session on every LAN machin
 - [x] **Web UI (#5).** `clawsh web`: loopback server, per-launch access key (localStorage, not a cookie), SSE overview, attach bridge, embedded UI (dashboard, terminal, new session, first run). Spec `docs/superpowers/specs/2026-10-01-web-ui-design.md`. Follow-ups: #6 LAN access, #7 per-agent UI, #8 edit hosts, #9 landing showcase.
 - [~] **Auto-agent PoC** (`docs/poc-auto-agent.md`). Claude Code plugin + `clawsh mcp` stub: spawns a detached agent if none runs, and announces sessions started outside clawsh (`/v1/external` leases, `external` in `ls`). Linux verified; Windows/macOS need the manual check in that doc.
 - [ ] **M3, status and alerts.** Agent launches claude with `--settings` injecting `Stop`, `Notification`, `UserPromptSubmit` hooks that run `clawsh hook <event>` (reads `CLAWSH_SESSION_ID`, posts to the agent). New states: working, idle, needs_input. Hub shows badges and rings the bell on needs_input.
-- [ ] **M4, hardening.** Agent as a service (systemd, launchd, Windows Service); hub auto-reconnect; Windows Job Object; multiple-viewer resize policy.
+- [ ] **M4, hardening.** Agent as a per-user login service (systemd user unit, launchd agent, Windows logon task), done by #36 (`clawsh agent install-service`); hub auto-reconnect; Windows Job Object; multiple-viewer resize policy.
 
 ## Later
 
