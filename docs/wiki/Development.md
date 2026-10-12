@@ -62,7 +62,14 @@ chore/release-workflow
 
 ## Docs
 
-The user docs live in the repository, in `docs/wiki/` (`Home.md` is the index), and are read on GitHub like any other Markdown; there's no separate GitHub wiki. Link between pages with relative `.md` links (`[Commands](Commands.md)`) so they work both on GitHub and in a local checkout, and change them in the same PR as the code they describe.
+The user docs live in the repository, in `docs/wiki/` (`Home.md` is the index, `_Sidebar.md` the page list and order); there's no separate GitHub wiki. They're published on the site at https://varogonz95.github.io/clawsh/docs/ and also read fine on GitHub as plain Markdown. Link between pages with relative `.md` links (`[Commands](Commands.md#flags)`) and change them in the same PR as the code they describe.
+
+`.github/workflows/pages.yml` builds the site with `scripts/docs/build.mjs`: it copies `site/` and renders each page into `docs/<page>.html` with the site's look (`site/docs.css`), using a vendored copy of [marked](https://github.com/markedjs/marked) (`scripts/docs/vendor/`), so there's nothing to install. A link to a missing page or heading fails the build; pull requests that touch the docs or the site run the build too. To preview:
+
+```sh
+node scripts/docs/build.mjs            # writes out/site
+python3 -m http.server -d out/site     # then open http://localhost:8000/docs/
+```
 
 ## Layout
 
