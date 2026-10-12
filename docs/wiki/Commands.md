@@ -65,6 +65,6 @@ Alias: `rm`. Asks the process to stop, forces it after 3 s, and removes the sess
 
 ### `clawsh web`
 
-Serves the browser UI on `127.0.0.1:7421` and opens it. Flags: `--listen` (loopback addresses only), `--no-open`, `--config`. See [Web UI](Web-UI.md).
+Serves the browser UI on `127.0.0.1:7421` and opens it. Flags: `--listen` (loopback addresses only), `--no-open`, `--config`, `--theme <clawsh|vscode|ayu>` (default `clawsh`; the display name `"VS Code"` works too) and `--appearance <dark|light|system>` (default `dark`; `system` follows the OS). See [Web UI](Web-UI.md).
 
 ### `clawsh version`, `clawsh help`
