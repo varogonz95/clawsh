@@ -5,6 +5,7 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -160,5 +161,89 @@ func TestExternalLease(t *testing.T) {
 	}
 	if s, _ := c.List(ctx); len(s) != 0 {
 		t.Fatalf("externals leaked into sessions: %+v", s)
+	}
+}
+
+func TestHookStatus(t *testing.T) {
+	m := agent.NewManager(agent.Options{Command: "/bin/sh"})
+	defer m.Shutdown()
+	srv := httptest.NewServer(agent.NewServer(m, "k").Handler())
+	defer srv.Close()
+	ctx := context.Background()
+	c := hub.NewClient(hub.Host{Name: "t", URL: srv.URL, Token: "k"})
+
+	sess, err := c.Create(ctx, api.CreateRequest{Dir: "/tmp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sess.Status != api.StatusRunning || sess.Origin != api.OriginManaged {
+		t.Fatalf("created = %+v", sess)
+	}
+	status := func() api.Session {
+		l, err := c.List(ctx)
+		if err != nil || len(l) != 1 {
+			t.Fatalf("list = %+v, %v", l, err)
+		}
+		return l[0]
+	}
+	for _, step := range []struct {
+		event string
+		want  api.Status
+	}{
+		{"UserPromptSubmit", api.StatusWorking},
+		{"Stop", api.StatusIdle},
+		{"Notification", api.StatusNeedsInput},
+		{"SessionStart", api.StatusIdle},
+		{"SessionEnd", api.StatusIdle},
+	} {
+		err := c.Hook(ctx, api.HookEvent{Event: step.event, SessionID: "claude-1", TranscriptPath: "/t.jsonl", ClawshSessionID: sess.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := status(); got.Status != step.want {
+			t.Fatalf("after %s status = %s, want %s", step.event, got.Status, step.want)
+		}
+	}
+	got := status()
+	if got.ClaudeSessionID != "claude-1" || got.Transcript != "/t.jsonl" || got.LastEvent == nil {
+		t.Fatalf("hook fields = %+v", got)
+	}
+
+	// Events without a (known) managed id are accepted and ignored.
+	for _, id := range []string{"", "nope"} {
+		if err := c.Hook(ctx, api.HookEvent{Event: "Stop", ClawshSessionID: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if status().Status != api.StatusIdle {
+		t.Fatal("ignored event changed a session")
+	}
+
+	// Bad JSON is a 400; no token is a 401.
+	req, _ := http.NewRequest("POST", srv.URL+"/v1/hooks", strings.NewReader("{"))
+	req.Header.Set("Authorization", "Bearer k")
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != 400 {
+		t.Fatalf("bad json: %v %v", resp, err)
+	}
+
+	// An exited session stays exited whatever arrives later.
+	if err := c.Hook(ctx, api.HookEvent{Event: "Stop", ClawshSessionID: sess.ID}); err != nil {
+		t.Fatal(err)
+	}
+	conn, err := c.Dial(ctx, sess.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.WriteMessage(websocket.BinaryMessage, []byte("exit 3\n"))
+	deadline := time.Now().Add(5 * time.Second)
+	for status().Status != api.StatusExited && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	conn.Close()
+	if err := c.Hook(ctx, api.HookEvent{Event: "UserPromptSubmit", ClawshSessionID: sess.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if got := status(); got.Status != api.StatusExited || got.ExitCode == nil || *got.ExitCode != 3 {
+		t.Fatalf("after exit = %+v", got)
 	}
 }

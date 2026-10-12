@@ -51,6 +51,8 @@ func main() {
 		err = runToken(args)
 	case "mcp":
 		err = runMCP(args)
+	case "hook":
+		runHook(args) // never fails: it runs inside Claude Code's hooks
 	case "hosts":
 		err = runHosts(args)
 	case "ls", "list":
@@ -88,6 +90,10 @@ agent side (run on each machine):
       [--no-spawn] [--no-announce]
                                      MCP stdio stub run by the Claude Code plugin:
                                      starts an agent if none runs, announces the session
+
+  hook <Event> [--listen :7420] [--token-file path]
+                                     Claude Code hook command: reports the event to the local agent
+                                     (stdin = hook JSON; always exits 0, prints nothing)
 
 hub side (run anywhere; reads hosts.toml):
   hosts                              reachability of every configured agent

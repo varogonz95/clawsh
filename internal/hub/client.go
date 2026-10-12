@@ -58,6 +58,11 @@ func (c *Client) Withdraw(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/external/"+url.PathEscape(id), nil, nil)
 }
 
+// Hook posts a Claude Code hook event to the agent.
+func (c *Client) Hook(ctx context.Context, ev api.HookEvent) error {
+	return c.do(ctx, http.MethodPost, "/v1/hooks", ev, nil)
+}
+
 // Dial opens the attach WebSocket for a session.
 func (c *Client) Dial(ctx context.Context, id string) (*websocket.Conn, error) {
 	u := c.Host.URL + "/v1/sessions/" + url.PathEscape(id) + "/attach"

@@ -238,7 +238,7 @@ function configError(ov) {
 
 function dashboard(ov) {
   const online = ov.hosts.filter((x) => x.online);
-  const running = online.reduce((n, x) => n + x.sessions.filter((s) => s.status === 'running').length, 0);
+  const running = online.reduce((n, x) => n + x.sessions.filter((s) => s.status !== 'exited' && s.status !== 'gone').length, 0);
   return [
     h('div', { class: 'page-head' },
       h('h1', {}, 'Your machines'),

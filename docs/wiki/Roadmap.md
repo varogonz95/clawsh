@@ -18,7 +18,7 @@ Later: split-pane views, mDNS discovery, TLS or Tailscale, sessions that survive
 
 - Only sessions started through clawsh are managed. A `claude` launched in a plain terminal shows up in `ls` as `external` when the [plugin](Plugin.md) is installed, but can't be attached to or killed.
 - Sessions stop when the agent stops. `claude --resume` recovers the conversation.
-- Status is `running` or `exited` only, until M3.
+- Status is `running` until the first hook arrives; hooks are not installed automatically yet (`clawsh hook` exists, `install-hooks` is a separate issue).
 - On Windows, killing a session doesn't yet kill claude's child processes.
 - With several viewers, the last resize wins.
 - On Windows, typing into a session right after it exits can misbehave in the agent. Tracked in issue #12.
