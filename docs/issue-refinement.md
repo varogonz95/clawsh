@@ -94,7 +94,7 @@ These apply to every `agent-ready` issue; the issue body doesn't need to repeat 
   the issue's **Manual checks** for a human.
 - Green before pushing: `make vet`, `make test`, and `node --test npm/test/*.test.mjs` when `npm/` changes.
 - New endpoints or control messages: types in `internal/api` first, then a test in `e2e_test.go`.
-- Update `docs/wiki` when commands, flags or the protocol change; never edit the GitHub wiki directly.
+- Update `docs/wiki` when commands, flags or the protocol change.
 - Stay inside **Scope**. Found something else? Open a new issue labelled `needs_refinement`; don't widen the PR.
 - Don't add dependencies the issue doesn't allow.
 - Never skip, disable or loosen a test to get green.
