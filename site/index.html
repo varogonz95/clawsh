@@ -229,8 +229,10 @@
       <ol class="steps">
         <li>
           <h3>Get the binary</h3>
-          <p>With Node 18+, install it from npm. There are also binaries on <a href="https://github.com/varogonz95/clawsh/releases">Releases</a>, or build it yourself with Go 1.22+.</p>
-<pre>npm i -g clawsh   <span class="dim"># or run it once: npx clawsh</span></pre>
+          <p>One line installs the latest release on Linux and macOS, another on Windows. There are also binaries on <a href="https://github.com/varogonz95/clawsh/releases">Releases</a>, npm for Node 18+, or build it yourself with Go 1.22+.</p>
+<pre>curl -fsSL https://varogonz95.github.io/clawsh/install.sh | sh
+<span class="dim"># Windows PowerShell:</span>
+irm https://varogonz95.github.io/clawsh/install.ps1 | iex</pre>
         </li>
         <li>
           <h3>Start an agent on each machine</h3>

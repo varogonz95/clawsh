@@ -18,6 +18,16 @@ Full docs live in the [wiki](docs/wiki/Home.md); the landing page is https://var
 
 ## Setup
 
+Install the latest release (checks the download against the release's checksums, no sudo or admin needed):
+
+```sh
+curl -fsSL https://varogonz95.github.io/clawsh/install.sh | sh   # Linux, macOS
+```
+
+```powershell
+irm https://varogonz95.github.io/clawsh/install.ps1 | iex   # Windows PowerShell
+```
+
 With Node 18+: `npm i -g clawsh`, or run it without installing: `npx clawsh ls`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source you need Go 1.22+.
 
 ```sh

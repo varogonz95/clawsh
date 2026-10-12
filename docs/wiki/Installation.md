@@ -2,6 +2,34 @@
 
 clawsh is a single static binary for Windows, Linux and macOS (amd64 and arm64).
 
+## Install script
+
+Linux and macOS:
+
+```sh
+curl -fsSL https://varogonz95.github.io/clawsh/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://varogonz95.github.io/clawsh/install.ps1 | iex
+```
+
+The script finds the latest [release](https://github.com/varogonz95/clawsh/releases), downloads the archive for your OS and CPU, checks it against the release's `checksums.txt`, and installs the binary without sudo or admin rights:
+
+- Linux and macOS: `~/.local/bin/clawsh`. If that directory isn't on your `PATH`, the script says so and prints the line to add.
+- Windows: `%LOCALAPPDATA%\Programs\clawsh\clawsh.exe`, and that folder is added to your user `PATH` (open a new terminal afterwards).
+
+Run it again to upgrade. Settings:
+
+| Variable | Default | |
+|---|---|---|
+| `CLAWSH_VERSION` | latest | Install a specific release, e.g. `0.1.0` |
+| `CLAWSH_INSTALL_DIR` | see above | Where the binary goes |
+
+With `curl … | sh`, set them on the `sh` side: `curl -fsSL …/install.sh | CLAWSH_VERSION=0.1.0 sh`. In PowerShell, set `$env:CLAWSH_VERSION = '0.1.0'` first. To read the script before running it, open [install.sh](https://varogonz95.github.io/clawsh/install.sh) or [install.ps1](https://varogonz95.github.io/clawsh/install.ps1); the source is in `site/` in the repository.
+
 ## npm
 
 With Node 18 or newer:
