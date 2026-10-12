@@ -18,7 +18,7 @@ Cross-machine manager for Claude Code sessions. Go 1.22, single binary with two 
 - `internal/mcp` — `clawsh mcp`: tool-less MCP stdio stub run by the Claude Code plugin; spawns a detached agent and announces the session (`/v1/external` lease). PoC, see `docs/poc-auto-agent.md`.
 - `npm/` — npm distribution: `clawsh/` is the launcher package (`bin/clawsh.js` runs the matching `clawsh-<os>-<cpu>` package's binary, or downloads it from the registry with a sha512 check); `build.mjs` stages all packages from `dist/` at release time; tests in `npm/test/` (`node --test npm/test/*.test.mjs`).
 - `plugin/` — the Claude Code plugin (`.mcp.json` runs `clawsh mcp`); `.claude-plugin/marketplace.json` at the root makes the repo a marketplace.
-- `docs/wiki` — user docs (GitHub-wiki style pages, `Home.md` is the index), mirrored to the GitHub wiki by `.github/workflows/wiki.yml` on push to `main`; never edit the wiki directly. Update them when flags, commands or the protocol change.
+- `docs/wiki` — user docs (`Home.md` is the index), read on GitHub straight from the repo; there is no separate GitHub wiki. Pages link to each other with relative `.md` links. Update them when flags, commands or the protocol change.
 - `site/` — static site deployed to GitHub Pages by `.github/workflows/pages.yml`: `index.html` (landing page), `app.html` (Web UI showcase: the screenshots in `img/` stacked in 3D, following pointer and device tilt), shared styles in `base.css`, and the one-line installers `install.sh` (Linux/macOS, POSIX sh) and `install.ps1` (Windows, PowerShell 5.1+) that fetch a release archive and check it against `checksums.txt`. No build step, no dependencies.
 
 ## Commands

@@ -62,7 +62,7 @@ chore/release-workflow
 
 ## Docs
 
-The wiki pages live in `docs/wiki/`; edit them there, not in the GitHub wiki. On every push to `main` that touches `docs/wiki/`, `.github/workflows/wiki.yml` mirrors the folder into the wiki, dropping `.md` from page links and pointing links outside the folder at the repo. The wiki has to exist before the first sync: create any page once in the GitHub UI.
+The user docs live in the repository, in `docs/wiki/` (`Home.md` is the index), and are read on GitHub like any other Markdown; there's no separate GitHub wiki. Link between pages with relative `.md` links (`[Commands](Commands.md)`) so they work both on GitHub and in a local checkout, and change them in the same PR as the code they describe.
 
 ## Layout
 
