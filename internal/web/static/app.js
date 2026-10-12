@@ -461,6 +461,12 @@ function openSession(host, id) {
   fit.fit();
   term.focus();
   const enc = new TextEncoder();
+  // xterm sends \r for Shift+Enter too; Claude Code reads ESC+CR as "newline".
+  term.attachCustomKeyEventHandler((ev) => {
+    if (!clawshKeys.shiftEnterNewline(ev)) return true;
+    send(v, enc.encode('\x1b\r'));
+    return false;
+  });
   term.onData((d) => send(v, enc.encode(d)));
   term.onBinary((d) => send(v, Uint8Array.from(d, (c) => c.charCodeAt(0))));
   term.onResize(({ cols, rows }) => sendResize(v, cols, rows));
