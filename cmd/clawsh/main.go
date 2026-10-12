@@ -424,7 +424,12 @@ func runWeb(args []string) error {
 	fs, cfgPath := hubFlags("web")
 	listen := fs.String("listen", "127.0.0.1:7421", "loopback address for the web UI")
 	noOpen := fs.Bool("no-open", false, "print the URL without opening a browser")
+	theme := fs.String("theme", web.DefaultTheme, "web UI theme: clawsh, vscode or ayu")
+	appearance := fs.String("appearance", web.DefaultAppearance, "web UI appearance: dark, light or system")
 	parseInterspersed(fs, args)
+	if _, _, err := web.ResolveLook(*theme, *appearance); err != nil {
+		return err
+	}
 	if err := web.CheckLoopback(*listen); err != nil {
 		return err
 	}
@@ -437,6 +442,8 @@ func runWeb(args []string) error {
 		ConfigPath: *cfgPath,
 		Secret:     secret,
 		Port:       ln.Addr().(*net.TCPAddr).Port,
+		Theme:      *theme,
+		Appearance: *appearance,
 	})
 	if err != nil {
 		ln.Close()

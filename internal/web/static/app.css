@@ -45,6 +45,8 @@
   --term-bg: #061214;
   --term-fg: #d6efe8;
   --term-selection: #1f4d4a;
+  --term-cursor: #ff6a52;
+  --term-ansi: #061214, #ff6a52, #5fd39a, #f0b84a, #79a8f5, #c79af0, #6fd3c0, #c3ddd6, #5f7f7a, #ff8f7a, #9be6c0, #f5c27a, #8fb8f8, #d5b0f5, #9be6d8, #ffffff;
   --term-font: 'JetBrains Mono', ui-monospace, monospace;
 }
 
@@ -185,4 +187,341 @@ details .field { margin-top: 12px; }
   .brand .mono { display: none; }
   .topbar .btn.primary { width: 44px; padding: 0; gap: 0; font-size: 0; }
   .topbar .btn.primary .icon { width: 20px; height: 20px; }
+}
+
+/* Themes (clawsh web --theme/--appearance). The :root block above is clawsh dark. */
+
+/* clawsh light: original palette, same crab accent family */
+:root[data-theme="clawsh"][data-mode="light"] {
+  --ground: #f4f8f6;
+  --ground-deep: #e6efec;
+  --panel: #ffffff;
+  --panel-dim: #eef4f2;
+  --raised: #e2ece9;
+  --rule: #cddad6;
+  --rule-strong: #9fb5af;
+  --ink: #10262a;
+  --ink-2: #2b4a4d;
+  --ink-soft: #456a6a;
+  --ink-dim: #4f6f6b;
+  --term: #fbfdfc;
+  --accent: #d9442c;
+  --on-accent: #ffffff;
+  --link: #0b6b5d;
+  --ok: #1f9d63;
+  --ok-ink: #146a43;
+  --ok-bg: #d5f0e2;
+  --warn-ink: #8a5a00;
+  --warn-bg: #fbefd2;
+  --danger: #a8281c;
+  --danger-line: #e0a49d;
+  --danger-solid: #c4473d;
+  --host-colors: #2f6fdb, #b7791f, #8a4fd0, #0f8f7c, #d4502f, #6b8e23;
+  --term-bg: #fbfdfc;
+  --term-fg: #1d3a3c;
+  --term-cursor: #d9442c;
+  --term-selection: #bfe3da;
+  --term-ansi: #1d3a3c, #c4473d, #1f8a55, #9a6a00, #2f6fdb, #8a4fd0, #0f8f7c, #cddad6, #4f6f6b, #e0604f, #2aa86a, #b8860b, #4f8df0, #a672e6, #25a893, #ffffff;
+}
+
+/* VS Code Dark Modern (microsoft/vscode extensions/theme-defaults, MIT) */
+:root[data-theme="vscode"][data-mode="dark"] {
+  --ground: #1f1f1f;
+  --ground-deep: #181818;
+  --panel: #252526;
+  --panel-dim: #202020;
+  --raised: #2d2d30;
+  --rule: #2b2b2b;
+  --rule-strong: #454545;
+  --ink: #cccccc;
+  --ink-2: #c0c0c0;
+  --ink-soft: #a0a0a0;
+  --ink-dim: #9d9d9d;
+  --term: #1f1f1f;
+  --accent: #0078d4;
+  --on-accent: #ffffff;
+  --link: #4daafc;
+  --ok: #2ea043;
+  --ok-ink: #89d185;
+  --ok-bg: #18301f;
+  --warn-ink: #cca700;
+  --warn-bg: #38300f;
+  --danger: #f48771;
+  --danger-line: #7a3a35;
+  --danger-solid: #c4473d;
+  --host-colors: #569cd6, #dcdcaa, #c586c0, #4ec9b0, #ce9178, #b5cea8;
+  --term-bg: #1f1f1f;
+  --term-fg: #cccccc;
+  --term-cursor: #ffffff;
+  --term-selection: #264f78;
+  --term-ansi: #000000, #cd3131, #0dbc79, #e5e510, #2472c8, #bc3fbc, #11a8cd, #e5e5e5, #666666, #f14c4c, #23d18b, #f5f543, #3b8eea, #d670d6, #29b8db, #e5e5e5;
+}
+
+/* VS Code Light Modern (microsoft/vscode extensions/theme-defaults, MIT) */
+:root[data-theme="vscode"][data-mode="light"] {
+  --ground: #ffffff;
+  --ground-deep: #f3f3f3;
+  --panel: #f8f8f8;
+  --panel-dim: #f3f3f3;
+  --raised: #e8e8e8;
+  --rule: #e5e5e5;
+  --rule-strong: #c8c8c8;
+  --ink: #3b3b3b;
+  --ink-2: #4a4a4a;
+  --ink-soft: #5e5e5e;
+  --ink-dim: #616161;
+  --term: #ffffff;
+  --accent: #005fb8;
+  --on-accent: #ffffff;
+  --link: #005fb8;
+  --ok: #388a34;
+  --ok-ink: #2d6b2a;
+  --ok-bg: #dff0dc;
+  --warn-ink: #7f5d00;
+  --warn-bg: #f8edc8;
+  --danger: #a1260d;
+  --danger-line: #e0a49d;
+  --danger-solid: #c4473d;
+  --host-colors: #0451a5, #795e26, #af00db, #098658, #a31515, #267f99;
+  --term-bg: #ffffff;
+  --term-fg: #3b3b3b;
+  --term-cursor: #005fb8;
+  --term-selection: #add6ff;
+  --term-ansi: #000000, #cd3131, #00bc00, #949800, #0451a5, #bc05bc, #0598bc, #555555, #666666, #cd3131, #14ce14, #b5ba00, #0451a5, #bc05bc, #0598bc, #a5a5a5;
+}
+
+/* Ayu Dark (ayu-theme/ayu-colors, MIT) */
+:root[data-theme="ayu"][data-mode="dark"] {
+  --ground: #0b0e14;
+  --ground-deep: #07090d;
+  --panel: #0f131a;
+  --panel-dim: #0d1017;
+  --raised: #151a23;
+  --rule: #1c2230;
+  --rule-strong: #2b3445;
+  --ink: #bfbdb6;
+  --ink-2: #aeaca6;
+  --ink-soft: #9a9892;
+  --ink-dim: #8a8984;
+  --term: #0b0e14;
+  --accent: #e6b450;
+  --on-accent: #0b0e14;
+  --link: #59c2ff;
+  --ok: #7fd962;
+  --ok-ink: #aad94c;
+  --ok-bg: #1b2a14;
+  --warn-ink: #ffb454;
+  --warn-bg: #33260f;
+  --danger: #f07178;
+  --danger-line: #6e3a3e;
+  --danger-solid: #c4473d;
+  --host-colors: #59c2ff, #ffb454, #d2a6ff, #95e6cb, #f07178, #aad94c;
+  --term-bg: #0b0e14;
+  --term-fg: #bfbdb6;
+  --term-cursor: #e6b450;
+  --term-selection: #273747;
+  --term-ansi: #01060e, #ea6c73, #91b362, #f9af4f, #53bdfa, #fae994, #90e1c6, #c7c7c7, #686868, #f07178, #c2d94c, #ffb454, #59c2ff, #ffee99, #95e6cb, #ffffff;
+}
+
+/* Ayu Light (ayu-theme/ayu-colors, MIT) */
+:root[data-theme="ayu"][data-mode="light"] {
+  --ground: #fcfcfc;
+  --ground-deep: #f3f4f5;
+  --panel: #ffffff;
+  --panel-dim: #f3f4f5;
+  --raised: #e9ebee;
+  --rule: #e1e4e8;
+  --rule-strong: #c3c8cf;
+  --ink: #4d5560;
+  --ink-2: #555c66;
+  --ink-soft: #5f6670;
+  --ink-dim: #646b75;
+  --term: #fcfcfc;
+  --accent: #d4720a;
+  --on-accent: #ffffff;
+  --link: #0b6fb3;
+  --ok: #4c9a1f;
+  --ok-ink: #3f7d12;
+  --ok-bg: #e3f2d6;
+  --warn-ink: #8a5000;
+  --warn-bg: #fbecd0;
+  --danger: #c0392b;
+  --danger-line: #e0a49d;
+  --danger-solid: #c4473d;
+  --host-colors: #3199e1, #ed9366, #a37acc, #4cbf99, #e65050, #86b300;
+  --term-bg: #fcfcfc;
+  --term-fg: #5c6166;
+  --term-cursor: #ff9940;
+  --term-selection: #d1e4f4;
+  --term-ansi: #000000, #ea6c6d, #6cbf43, #eca944, #3199e1, #9e75c7, #46ba94, #bababa, #686868, #f07171, #86b300, #f2ae49, #399ee6, #a37acc, #4cbf99, #d3d3d3;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="clawsh"][data-mode="system"] {
+    --ground: #f4f8f6;
+    --ground-deep: #e6efec;
+    --panel: #ffffff;
+    --panel-dim: #eef4f2;
+    --raised: #e2ece9;
+    --rule: #cddad6;
+    --rule-strong: #9fb5af;
+    --ink: #10262a;
+    --ink-2: #2b4a4d;
+    --ink-soft: #456a6a;
+    --ink-dim: #4f6f6b;
+    --term: #fbfdfc;
+    --accent: #d9442c;
+    --on-accent: #ffffff;
+    --link: #0b6b5d;
+    --ok: #1f9d63;
+    --ok-ink: #146a43;
+    --ok-bg: #d5f0e2;
+    --warn-ink: #8a5a00;
+    --warn-bg: #fbefd2;
+    --danger: #a8281c;
+    --danger-line: #e0a49d;
+    --danger-solid: #c4473d;
+    --host-colors: #2f6fdb, #b7791f, #8a4fd0, #0f8f7c, #d4502f, #6b8e23;
+    --term-bg: #fbfdfc;
+    --term-fg: #1d3a3c;
+    --term-cursor: #d9442c;
+    --term-selection: #bfe3da;
+    --term-ansi: #1d3a3c, #c4473d, #1f8a55, #9a6a00, #2f6fdb, #8a4fd0, #0f8f7c, #cddad6, #4f6f6b, #e0604f, #2aa86a, #b8860b, #4f8df0, #a672e6, #25a893, #ffffff;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="vscode"][data-mode="system"] {
+    --ground: #1f1f1f;
+    --ground-deep: #181818;
+    --panel: #252526;
+    --panel-dim: #202020;
+    --raised: #2d2d30;
+    --rule: #2b2b2b;
+    --rule-strong: #454545;
+    --ink: #cccccc;
+    --ink-2: #c0c0c0;
+    --ink-soft: #a0a0a0;
+    --ink-dim: #9d9d9d;
+    --term: #1f1f1f;
+    --accent: #0078d4;
+    --on-accent: #ffffff;
+    --link: #4daafc;
+    --ok: #2ea043;
+    --ok-ink: #89d185;
+    --ok-bg: #18301f;
+    --warn-ink: #cca700;
+    --warn-bg: #38300f;
+    --danger: #f48771;
+    --danger-line: #7a3a35;
+    --danger-solid: #c4473d;
+    --host-colors: #569cd6, #dcdcaa, #c586c0, #4ec9b0, #ce9178, #b5cea8;
+    --term-bg: #1f1f1f;
+    --term-fg: #cccccc;
+    --term-cursor: #ffffff;
+    --term-selection: #264f78;
+    --term-ansi: #000000, #cd3131, #0dbc79, #e5e510, #2472c8, #bc3fbc, #11a8cd, #e5e5e5, #666666, #f14c4c, #23d18b, #f5f543, #3b8eea, #d670d6, #29b8db, #e5e5e5;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="vscode"][data-mode="system"] {
+    --ground: #ffffff;
+    --ground-deep: #f3f3f3;
+    --panel: #f8f8f8;
+    --panel-dim: #f3f3f3;
+    --raised: #e8e8e8;
+    --rule: #e5e5e5;
+    --rule-strong: #c8c8c8;
+    --ink: #3b3b3b;
+    --ink-2: #4a4a4a;
+    --ink-soft: #5e5e5e;
+    --ink-dim: #616161;
+    --term: #ffffff;
+    --accent: #005fb8;
+    --on-accent: #ffffff;
+    --link: #005fb8;
+    --ok: #388a34;
+    --ok-ink: #2d6b2a;
+    --ok-bg: #dff0dc;
+    --warn-ink: #7f5d00;
+    --warn-bg: #f8edc8;
+    --danger: #a1260d;
+    --danger-line: #e0a49d;
+    --danger-solid: #c4473d;
+    --host-colors: #0451a5, #795e26, #af00db, #098658, #a31515, #267f99;
+    --term-bg: #ffffff;
+    --term-fg: #3b3b3b;
+    --term-cursor: #005fb8;
+    --term-selection: #add6ff;
+    --term-ansi: #000000, #cd3131, #00bc00, #949800, #0451a5, #bc05bc, #0598bc, #555555, #666666, #cd3131, #14ce14, #b5ba00, #0451a5, #bc05bc, #0598bc, #a5a5a5;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="ayu"][data-mode="system"] {
+    --ground: #0b0e14;
+    --ground-deep: #07090d;
+    --panel: #0f131a;
+    --panel-dim: #0d1017;
+    --raised: #151a23;
+    --rule: #1c2230;
+    --rule-strong: #2b3445;
+    --ink: #bfbdb6;
+    --ink-2: #aeaca6;
+    --ink-soft: #9a9892;
+    --ink-dim: #8a8984;
+    --term: #0b0e14;
+    --accent: #e6b450;
+    --on-accent: #0b0e14;
+    --link: #59c2ff;
+    --ok: #7fd962;
+    --ok-ink: #aad94c;
+    --ok-bg: #1b2a14;
+    --warn-ink: #ffb454;
+    --warn-bg: #33260f;
+    --danger: #f07178;
+    --danger-line: #6e3a3e;
+    --danger-solid: #c4473d;
+    --host-colors: #59c2ff, #ffb454, #d2a6ff, #95e6cb, #f07178, #aad94c;
+    --term-bg: #0b0e14;
+    --term-fg: #bfbdb6;
+    --term-cursor: #e6b450;
+    --term-selection: #273747;
+    --term-ansi: #01060e, #ea6c73, #91b362, #f9af4f, #53bdfa, #fae994, #90e1c6, #c7c7c7, #686868, #f07178, #c2d94c, #ffb454, #59c2ff, #ffee99, #95e6cb, #ffffff;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="ayu"][data-mode="system"] {
+    --ground: #fcfcfc;
+    --ground-deep: #f3f4f5;
+    --panel: #ffffff;
+    --panel-dim: #f3f4f5;
+    --raised: #e9ebee;
+    --rule: #e1e4e8;
+    --rule-strong: #c3c8cf;
+    --ink: #4d5560;
+    --ink-2: #555c66;
+    --ink-soft: #5f6670;
+    --ink-dim: #646b75;
+    --term: #fcfcfc;
+    --accent: #d4720a;
+    --on-accent: #ffffff;
+    --link: #0b6fb3;
+    --ok: #4c9a1f;
+    --ok-ink: #3f7d12;
+    --ok-bg: #e3f2d6;
+    --warn-ink: #8a5000;
+    --warn-bg: #fbecd0;
+    --danger: #c0392b;
+    --danger-line: #e0a49d;
+    --danger-solid: #c4473d;
+    --host-colors: #3199e1, #ed9366, #a37acc, #4cbf99, #e65050, #86b300;
+    --term-bg: #fcfcfc;
+    --term-fg: #5c6166;
+    --term-cursor: #ff9940;
+    --term-selection: #d1e4f4;
+    --term-ansi: #000000, #ea6c6d, #6cbf43, #eca944, #3199e1, #9e75c7, #46ba94, #bababa, #686868, #f07171, #86b300, #f2ae49, #399ee6, #a37acc, #4cbf99, #d3d3d3;
+  }
 }

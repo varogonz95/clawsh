@@ -9,8 +9,10 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -27,6 +29,8 @@ type Options struct {
 	Secret     string        // access key from NewSecret; required
 	Port       int           // port the server listens on, for the Host check
 	PollEvery  time.Duration // agent polling interval while a browser is connected; 0 means 2s
+	Theme      string        // theme ID or name; empty means clawsh
+	Appearance string        // dark, light or system; empty means dark
 }
 
 type Server struct {
@@ -34,6 +38,8 @@ type Server struct {
 	bc     *broadcaster
 	secret string // the access key
 	port   int
+	theme  Theme
+	mode   string
 	up     websocket.Upgrader
 }
 
@@ -42,6 +48,10 @@ type Server struct {
 func New(o Options) (*Server, error) {
 	if o.Secret == "" {
 		return nil, errors.New("web: empty access key")
+	}
+	theme, mode, err := ResolveLook(o.Theme, o.Appearance)
+	if err != nil {
+		return nil, err
 	}
 	hosts, err := loadHostsFile(o.ConfigPath)
 	if err != nil {
@@ -52,7 +62,7 @@ func New(o Options) (*Server, error) {
 	}
 	s := &Server{
 		hosts: hosts, bc: newBroadcaster(hosts, o.PollEvery),
-		secret: o.Secret, port: o.Port,
+		secret: o.Secret, port: o.Port, theme: theme, mode: mode,
 	}
 	s.up = websocket.Upgrader{
 		ReadBufferSize:  32 * 1024,
@@ -92,6 +102,7 @@ func (s *Server) serveIndex(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	b = applyLook(b, s.theme.ID, s.mode)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	// No framing by other pages. Only frame-ancestors: a script or style
@@ -109,4 +120,18 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func writeErr(w http.ResponseWriter, code int, err error) {
 	writeJSON(w, code, api.Error{Error: err.Error()})
+}
+
+// applyLook writes the chosen theme onto <html> and the matching color-scheme
+// meta, so the first paint already has the right colours.
+func applyLook(page []byte, theme, mode string) []byte {
+	scheme := mode
+	if mode == "system" {
+		scheme = "dark light"
+	}
+	out := strings.Replace(string(page), `<html lang="en">`,
+		fmt.Sprintf(`<html lang="en" data-theme="%s" data-mode="%s">`, theme, mode), 1)
+	out = strings.Replace(out, `<meta name="color-scheme" content="dark">`,
+		fmt.Sprintf(`<meta name="color-scheme" content="%s">`, scheme), 1)
+	return []byte(out)
 }

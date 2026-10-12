@@ -17,6 +17,8 @@ To keep the access key off the command line, the browser is opened through a sho
 | `--listen` | `127.0.0.1:7421` | Loopback address to serve on. Other addresses are refused. |
 | `--no-open` | off | Print the link without opening a browser |
 | `--config` | `<config dir>/clawsh/hosts.toml` | Hosts file |
+| `--theme` | `clawsh` | Look of the page and the terminal: `clawsh`, `vscode` (VS Code Dark/Light Modern) or `ayu`. The name (`"VS Code"`) works too |
+| `--appearance` | `dark` | `dark`, `light`, or `system` to follow the OS and switch live |
 
 ## What you see
 
