@@ -1,0 +1,104 @@
+/* The docs pages (docs/*.html, built from docs/wiki/ by scripts/docs/build.mjs).
+   Tokens and the header/footer come from base.css. */
+
+.top nav a[aria-current="page"] { color: var(--ink); }
+
+.docs { display: grid; gap: 8px 48px; padding-bottom: 72px; }
+@media (min-width: 880px) { .docs { grid-template-columns: 220px minmax(0, 1fr); align-items: start; } }
+
+/* page list: a sticky column on wide screens, a collapsible list above the page on narrow ones */
+.pages { font-size: .95rem; }
+@media (min-width: 880px) { .pages { position: sticky; top: 24px; padding-top: 40px; } }
+.pages summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--foam);
+}
+@media (min-width: 880px) { .pages summary { display: none; } }
+.pages ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.pages a {
+  display: block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+.pages a:hover { color: var(--ink); background: var(--foam); }
+.pages a[aria-current="page"] { color: var(--ink); font-weight: 700; background: var(--foam); box-shadow: inset 3px 0 0 var(--shell); }
+
+/* the page itself */
+.prose { min-width: 0; padding-top: 32px; }
+.prose > :first-child { margin-top: 0; }
+.prose h1 {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 6vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: -.01em;
+  margin: 0 0 24px;
+}
+.prose h2 {
+  font-size: clamp(1.5rem, 3.4vw, 2rem);
+  margin: 48px 0 14px;
+  max-width: none;
+}
+.prose h3 { font-size: 1.15rem; margin: 32px 0 8px; }
+.prose h4 { font-size: 1rem; margin: 24px 0 6px; }
+.prose h1, .prose h2, .prose h3, .prose h4 { position: relative; scroll-margin-top: 16px; }
+.prose .anchor {
+  position: absolute;
+  right: 100%;
+  padding-right: .3em;
+  color: var(--rule);
+  text-decoration: none;
+  opacity: 0;
+}
+.prose :is(h1, h2, h3, h4):hover .anchor, .prose .anchor:focus-visible { opacity: 1; }
+@media (max-width: 879px) { .prose .anchor { display: none; } }
+
+.prose p, .prose li { max-width: 70ch; }
+.prose ul, .prose ol { padding-left: 1.4em; margin: 0 0 16px; }
+.prose li { margin-bottom: 6px; }
+.prose li > ul, .prose li > ol { margin: 6px 0 0; }
+.prose a { color: var(--ink); text-decoration-color: var(--shell); text-decoration-thickness: 2px; }
+.prose a:hover { color: var(--shell); }
+.prose strong { font-weight: 700; }
+.prose blockquote {
+  margin: 0 0 16px;
+  padding: 4px 18px;
+  border-left: 4px solid var(--shell);
+  background: var(--foam);
+  border-radius: 0 10px 10px 0;
+}
+.prose hr { border: 0; border-top: 1px solid var(--rule); margin: 40px 0; }
+
+.prose code {
+  padding: .1em .35em;
+  border-radius: 5px;
+  background: var(--foam);
+  border: 1px solid color-mix(in srgb, var(--rule) 60%, transparent);
+}
+.prose pre {
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  background: var(--deep);
+  color: var(--deep-fg);
+  border-radius: 12px;
+  font-size: .82rem;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+.prose pre code { padding: 0; background: none; border: 0; font-size: inherit; color: inherit; }
+
+.prose .table { overflow-x: auto; margin: 0 0 20px; }
+.prose table { border-collapse: collapse; min-width: 100%; font-size: .95rem; }
+.prose th, .prose td { text-align: left; vertical-align: top; padding: 8px 14px; border-bottom: 1px solid var(--rule); }
+.prose th { font-weight: 700; border-bottom-width: 2px; white-space: nowrap; }
+
+.prose .edit { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: .95rem; }
+.prose .edit a { color: var(--ink-soft); }
+.prose td:first-child code { white-space: nowrap; } /* flags and names stay whole; the table scrolls instead */
+.prose :is(h1, h2, h3, h4) code { padding: 0; background: none; border: 0; font-size: .88em; }

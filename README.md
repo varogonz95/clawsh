@@ -14,7 +14,7 @@ One binary, two roles:
 - **agent**: runs on each machine, owns `claude` processes inside PTYs (ConPTY on Windows), keeps them alive while nobody is watching, and serves a small REST + WebSocket API.
 - **hub**: the `hosts / ls / new / attach / kill / web` commands, run from whichever terminal you're in.
 
-Full docs live in the [wiki](docs/wiki/Home.md); the landing page is https://varogonz95.github.io/clawsh/ (source in `site/index.html`)
+Full docs are at https://varogonz95.github.io/clawsh/docs/ (source in [`docs/wiki/`](docs/wiki/Home.md)); the landing page is https://varogonz95.github.io/clawsh/ (source in `site/index.html`)
 
 ## Setup
 

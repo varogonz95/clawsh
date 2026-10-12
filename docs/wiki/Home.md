@@ -1,4 +1,4 @@
-# clawsh wiki
+# clawsh docs
 
 clawsh lets you see and drive every Claude Code session on every machine in your LAN from one terminal.
 
@@ -16,7 +16,7 @@ laptop/3fa0c1  frontend  running  1        12m    C:\src\frontend
 
 ## Pages
 
-- [Installation](Installation.md): build from source or with Docker
+- [Installation](Installation.md): install script, npm, prebuilt binaries or from source
 - [Quick start](Quick-Start.md): agents, `hosts.toml`, your first session
 - [Commands](Commands.md): every subcommand and flag
 - [Web UI](Web-UI.md): `clawsh web`, the browser dashboard
