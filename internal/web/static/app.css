@@ -186,3 +186,7 @@ details .field { margin-top: 12px; }
   .topbar .btn.primary { width: 44px; padding: 0; gap: 0; font-size: 0; }
   .topbar .btn.primary .icon { width: 20px; height: 20px; }
 }
+
+/* machines page */
+.host-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.host-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border-radius: 10px; background: var(--raised); border: 1px solid var(--rule-strong); }
