@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>clawsh CLI: all your Claudes, one shell</title>
+<meta name="description" content="The clawsh CLI: list, start, attach to and stop Claude Code sessions on any machine in your network from whichever terminal you're at.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bagel+Fat+One&family=Martian+Mono:wdth,wght@87.5,400;87.5,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+/* terminal, with the crab living on its top edge */
+.term {
+  position: relative;
+  margin-top: 96px;
+  background: var(--deep);
+  color: var(--deep-fg);
+  border-radius: 14px;
+  font: 400 .84rem/1.75 var(--mono);
+  font-stretch: 87.5%;
+  /* the terminal is dark in both themes, so hosts use their bright shades */
+  --desk: #79a8f5;
+  --laptop: #f0b84a;
+  --studio: #c79af0;
+}
+.term-bar {
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  color: var(--deep-dim);
+}
+.term-bar b { font-weight: 400; white-space: nowrap; }
+.scenes { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+.scenes button {
+  font: inherit; color: var(--deep-dim); background: none;
+  border: 0; border-radius: 6px; padding: 2px 9px; cursor: pointer;
+}
+.scenes button:hover { color: var(--deep-fg); }
+.scenes button[aria-pressed="true"] { color: var(--deep-fg); background: rgba(255,255,255,.1); }
+.scenes button:focus-visible { outline: 2px solid var(--desk); outline-offset: 1px; }
+.term pre { margin: 0; padding: 20px; overflow-x: auto; min-height: calc(8 * 1.75em + 40px); /* tallest scene; keeps the page still */ }
+.prompt, .dim { color: var(--deep-dim); }
+.h-desk { color: var(--desk); }
+.h-laptop { color: var(--laptop); }
+.h-studio { color: var(--studio); }
+.term .ok { color: #7fd6a8; }
+.term .sess { display: inline-block; padding-left: 12px; border-left: 2px solid rgba(255,255,255,.14); }
+.term .key { display: inline-block; padding: 0 .45em; line-height: 1.5; border: 1px solid rgba(255,255,255,.28); border-radius: 4px; color: var(--deep-fg); }
+.caret { display: inline-block; width: .6em; height: 1.1em; vertical-align: -.2em; background: var(--deep-fg); animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.crab {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 75px;
+  height: 45px;
+  margin-bottom: -5px;
+  color: var(--shell);
+  --eye: var(--ink);
+  transform: translateX(var(--x, 24px));
+  transition: transform .9s cubic-bezier(.45, 0, .3, 1);
+  pointer-events: none;
+}
+.crab .legs { transform-origin: 50% 100%; }
+.crab.walking .legs { animation: scuttle .15s steps(2) infinite; }
+.crab.walking .claws { animation: snip .3s steps(2) infinite; }
+@keyframes scuttle { 50% { transform: translateX(1px); } }
+@keyframes snip { 50% { transform: translateY(1px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .caret, .crab.walking .legs, .crab.walking .claws { animation: none; }
+  .crab { transition: none; }
+  .btn:hover, .btn:active { transform: none; }
+}
+
+
+/* how it works */
+.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; }
+@media (min-width: 880px) { .split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: center; } }
+.roles { display: grid; gap: 28px; margin-top: 32px; }
+.role { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 0 16px; align-items: start; }
+.role svg { width: 52px; height: auto; color: var(--shell); margin-top: 2px; --eye: var(--ink); }
+.role p { margin: 0; }
+.diagram { width: 100%; height: auto; }
+@media (max-width: 559px) { .diagram { display: none; } /* the roles above say the same; labels get too small */ }
+.diagram .rock { fill: var(--foam); stroke: var(--rule); stroke-width: 1.5; }
+.diagram .you { fill: var(--deep); }
+.diagram text { font-family: var(--text); fill: var(--ink); font-size: 16px; font-weight: 700; }
+.diagram .sub { font-family: var(--mono); font-stretch: 87.5%; font-size: 11px; fill: var(--ink-soft); font-weight: 400; }
+.diagram .you-t { fill: var(--deep-fg); }
+.diagram .you-s { fill: var(--deep-dim); }
+.diagram .line { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1 9; }
+
+/* setup: a real sequence, so numbered */
+.steps { list-style: none; padding: 0; margin: 40px 0 0; counter-reset: s; display: grid; gap: 36px; }
+@media (min-width: 880px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px 48px; } }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); gap: 0 14px; align-content: start; }
+.steps li::before {
+  content: counter(s);
+  grid-row: span 3;
+  font-family: var(--display);
+  font-size: 2rem; line-height: 1.05;
+  color: var(--shell);
+}
+.steps p { margin: 0; }
+.steps pre {
+  margin: 10px 0 0;
+  padding: 14px 16px;
+  background: var(--deep);
+  color: var(--deep-fg);
+  border-radius: 10px;
+  font-size: .8rem;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+.steps pre .dim { color: var(--deep-dim); }
+
+.more { margin-top: 44px; }
+
+</style>
+</head>
+<body>
+
+<!-- one crab, drawn once, reused by the hero and the "how it works" roles -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+          <g id="crab-body"><g class="claws"><rect x="0" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="12" y="0" width="1" height="1"/><rect x="14" y="0" width="1" height="1"/><rect x="0" y="1" width="3" height="1"/><rect x="12" y="1" width="3" height="1"/><rect x="1" y="2" width="1" height="1"/><rect x="13" y="2" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="13" y="3" width="1" height="1"/></g><rect x="5" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="1" y="4" width="13" height="1"/><rect x="0" y="5" width="15" height="1"/><rect x="1" y="6" width="13" height="1"/><g fill="var(--eye)"><rect x="5" y="2" width="1" height="1"/><rect x="9" y="2" width="1" height="1"/></g><g class="legs"><rect x="1" y="7" width="1" height="1"/><rect x="3" y="7" width="1" height="1"/><rect x="5" y="7" width="1" height="1"/><rect x="9" y="7" width="1" height="1"/><rect x="11" y="7" width="1" height="1"/><rect x="13" y="7" width="1" height="1"/><rect x="0" y="8" width="1" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="10" y="8" width="1" height="1"/><rect x="14" y="8" width="1" height="1"/></g></g>
+  </defs>
+</svg>
+
+<header class="wrap top">
+  <a class="mark" href="./" aria-label="clawsh home">claw<span class="sh" aria-hidden="true">sh</span></a>
+  <nav aria-label="Main">
+    <a href="./#web">Web UI</a>
+    <a href="./#install">Install</a>
+    <a href="cli.html" aria-current="page">CLI</a>
+    <a href="https://github.com/varogonz95/clawsh/blob/main/docs/wiki/Home.md">Docs</a>
+    <a href="https://github.com/varogonz95/clawsh">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>All your Claudes, one shell.</h1>
+    <p class="lede">Everything the web UI does, from any terminal. Start Claude Code on any machine in your network, leave it working, and scuttle back in from whichever terminal you're at.</p>
+    <div class="actions">
+      <a class="btn" href="./#install">Install clawsh</a>
+      <a class="quiet" href="https://github.com/varogonz95/clawsh/blob/main/docs/wiki/Commands.md">All the commands</a>
+    </div>
+
+    <div class="term" role="group" aria-label="clawsh demo">
+      <svg class="crab" viewBox="0 0 15 9" aria-hidden="true" fill="currentColor" shape-rendering="crispEdges"><use href="#crab-body"/></svg>
+      <div class="term-bar"><b aria-hidden="true">laptop: ~</b>
+        <div class="scenes" hidden></div>
+      </div>
+      <p class="sr-only" id="term-desc">clawsh ls lists sessions on three machines: desk, laptop and studio.</p>
+<pre aria-hidden="true"><span class="prompt">$</span> clawsh ls
+<span class="dim">TARGET           NAME       STATUS     VIEWERS  AGE    DIR</span>
+<span class="h-desk">desk/815856a6</span>    api        running    0        2h14m  /home/alvaro/src/api
+<span class="h-desk">desk/c01d9e42</span>    infra      running    0        47m    /home/alvaro/src/infra
+<span class="h-laptop">laptop/3fa0c1b7</span>  frontend   running    1        12m    C:\src\frontend
+<span class="h-studio">studio/9e27aa10</span>  docs       exited(0)  0        3h02m  /Users/alvaro/src/docs
+<span class="prompt">$</span> <span class="caret"></span></pre>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap split">
+      <div>
+        <h2>A crab on every machine, a shell wherever you are.</h2>
+        <p class="soft">It's the same binary in both places.</p>
+        <div class="roles">
+          <div class="role">
+            <svg viewBox="0 0 15 9" aria-hidden="true" fill="currentColor" shape-rendering="crispEdges"><use href="#crab-body"/></svg>
+            <div>
+              <h3><code>clawsh agent</code></h3>
+              <p>Runs on each machine that hosts sessions. It keeps claude running in a terminal of its own, so the work carries on after you leave, and it remembers recent output for when you come back.</p>
+            </div>
+          </div>
+          <div class="role">
+            <svg viewBox="0 0 60 40" aria-hidden="true"><rect x="4" y="4" width="52" height="32" rx="5" fill="var(--deep)"/><path d="M14 14 l7 6 -7 6" fill="none" stroke="var(--deep-fg)" stroke-width="3"/><rect x="26" y="25" width="12" height="3" fill="var(--deep-fg)"/></svg>
+            <div>
+              <h3><code>clawsh ls</code>, <code>new</code>, <code>attach</code>, <code>kill</code></h3>
+              <p>Run them from any terminal. They read your list of machines and talk to each agent over your LAN. Attaching takes over your terminal; <kbd>Ctrl</kbd>+<kbd>]</kbd> hands it back and leaves claude working.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <svg class="diagram" viewBox="0 0 520 380" role="img" aria-labelledby="dg-t">
+        <title id="dg-t">Three machines, desk, laptop and studio, each run a clawsh agent and connect to the terminal you're typing in.</title>
+        <path class="line" d="M176 62 C 290 62, 300 190, 340 190" stroke="var(--desk)"/>
+        <path class="line" d="M176 190 L 340 190" stroke="var(--laptop)"/>
+        <path class="line" d="M176 318 C 290 318, 300 190, 340 190" stroke="var(--studio)"/>
+
+        <rect class="rock" x="10" y="20" width="166" height="84" rx="22"/>
+        <circle cx="34" cy="49" r="7" fill="var(--desk)"/>
+        <text x="48" y="55">desk</text>
+        <text class="sub" x="28" y="82">linux agent</text>
+
+        <rect class="rock" x="10" y="148" width="166" height="84" rx="22"/>
+        <circle cx="34" cy="177" r="7" fill="var(--laptop)"/>
+        <text x="48" y="183">laptop</text>
+        <text class="sub" x="28" y="210">windows agent</text>
+
+        <rect class="rock" x="10" y="276" width="166" height="84" rx="22"/>
+        <circle cx="34" cy="305" r="7" fill="var(--studio)"/>
+        <text x="48" y="311">studio</text>
+        <text class="sub" x="28" y="338">macos agent</text>
+
+        <rect class="you" x="340" y="128" width="172" height="124" rx="14"/>
+        <text class="you-t" x="360" y="170">your terminal</text>
+        <text class="sub you-s" x="360" y="200">$ clawsh attach</text>
+        <text class="sub you-s" x="360" y="220">  desk/8158</text>
+      </svg>
+    </div>
+  </section>
+
+  <section id="start">
+    <div class="wrap">
+      <h2>Up and scuttling</h2>
+      <p class="soft">Install clawsh, start an agent on each machine and list them in <code>hosts.toml</code>: the <a href="./#install">install steps</a> cover it. Then:</p>
+      <ol class="steps">
+        <li>
+          <h3>Check every machine answers</h3>
+          <p>Each agent reports its name, OS and version.</p>
+<pre>clawsh hosts</pre>
+        </li>
+        <li>
+          <h3>Start a session and attach</h3>
+          <p>Anything after <code>--</code> goes straight to claude. <code>--detached</code> starts it without attaching.</p>
+<pre>clawsh new desk --dir ~/src/api -- --resume
+clawsh attach desk/8158   <span class="dim"># an ID prefix is enough</span></pre>
+        </li>
+      </ol>
+      <p class="soft more">Before relying on it, read <a href="./#know">what doesn't work yet</a> and the <a href="https://github.com/varogonz95/clawsh/blob/main/docs/wiki/Security.md">security notes</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span><span class="mark">claw<span class="sh">sh</span></span> &nbsp;A cross-machine manager for Claude Code. Not affiliated with Anthropic.</span>
+    <span><a href="https://github.com/varogonz95/clawsh/blob/main/docs/wiki/Home.md">Docs</a> &nbsp; <a href="https://github.com/varogonz95/clawsh/blob/main/LICENSE">License</a> &nbsp; <a href="https://github.com/varogonz95/clawsh">GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // Each scene mirrors the real CLI's output format (cmd/clawsh/main.go, hub/attach.go).
+  const D = '<span class="h-desk">', L = '<span class="h-laptop">', S = '<span class="h-studio">', E = '</span>';
+  const sess = t => `<span class="sess">${t}</span>`;
+  const key = { html: '<span class="key">Ctrl-]</span>', wait: 700 };
+  const scenes = [
+    { label: "hosts", cmd: "clawsh hosts",
+      desc: "clawsh hosts checks that every configured agent is reachable: desk on Linux, laptop on Windows, studio on macOS.",
+      out: [
+        '<span class="dim">HOST    URL                        STATUS</span>',
+        `${D}desk${E}    http://192.168.1.20:7420   <span class="ok">ok</span> (desk, linux, v0.1.0)`,
+        `${L}laptop${E}  http://192.168.1.31:7420   <span class="ok">ok</span> (laptop, windows, v0.1.0)`,
+        `${S}studio${E}  http://192.168.1.42:7420   <span class="ok">ok</span> (studio, darwin, v0.1.0)`,
+      ] },
+    { label: "ls", cmd: "clawsh ls",
+      desc: "clawsh ls lists sessions on three machines: desk, laptop and studio.",
+      out: [
+        '<span class="dim">TARGET           NAME       STATUS     VIEWERS  AGE    DIR</span>',
+        `${D}desk/815856a6${E}    api        running    0        2h14m  /home/alvaro/src/api`,
+        `${D}desk/c01d9e42${E}    infra      running    0        47m    /home/alvaro/src/infra`,
+        `${L}laptop/3fa0c1b7${E}  frontend   running    1        12m    C:\\src\\frontend`,
+        `${S}studio/9e27aa10${E}  docs       exited(0)  0        3h02m  /Users/alvaro/src/docs`,
+      ] },
+    { label: "new", cmd: "clawsh new desk --dir ~/src/billing",
+      desc: "clawsh new starts claude on desk in ~/src/billing and attaches; Ctrl-] detaches and leaves it running.",
+      out: [
+        `created ${D}desk/5d0e2b19${E} in /home/alvaro/src/billing`,
+        sess('<span class="dim">&gt;</span> add retries to the invoice webhook'),
+        sess('● Reading internal/webhook/invoice.go'),
+        sess('● Editing internal/webhook/invoice.go'),
+        key,
+        `<span class="dim">[detached from desk/5d0e2b19]</span>`,
+      ] },
+    { label: "attach", cmd: "clawsh attach laptop/3fa0",
+      desc: "clawsh attach laptop/3fa0 replays recent output from the frontend session, then hands the terminal back on Ctrl-].",
+      out: [
+        sess('● Updated src/components/Nav.tsx'),
+        sess('● Ran npm test: 42 passed'),
+        sess('<span class="dim">&gt;</span> also make the nav sticky on mobile'),
+        sess('● Editing src/components/Nav.css'),
+        key,
+        `<span class="dim">[detached from laptop/3fa0]</span>`,
+      ] },
+    { label: "kill", cmd: "clawsh kill studio/9e27",
+      desc: "clawsh kill studio/9e27 stops and removes the finished docs session on studio.",
+      out: [ `killed ${S}studio/9e27${E}` ] },
+  ];
+
+  const term = document.querySelector(".term");
+  const pre = term.querySelector("pre");
+  const desc = document.getElementById("term-desc");
+  const bar = term.querySelector(".scenes");
+  const crab = term.querySelector(".crab");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const prompt = '<span class="prompt">$</span> ';
+  const caret = '<span class="caret"></span>';
+
+  const buttons = scenes.map((s, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = s.label;
+    b.setAttribute("aria-label", `Show clawsh ${s.label}`);
+    b.addEventListener("click", () => start(i));
+    bar.append(b);
+    return b;
+  });
+  bar.hidden = false;
+
+  // The crab walks sideways to sit above the command that's playing.
+  let current = 0;
+  function moveCrab(animate) {
+    const b = buttons[current].getBoundingClientRect();
+    const t = term.getBoundingClientRect();
+    const x = Math.max(8, Math.min(t.width - crab.getBoundingClientRect().width - 8, b.left - t.left + b.width / 2 - crab.getBoundingClientRect().width / 2));
+    const from = parseFloat(crab.style.getPropertyValue("--x")) || 24;
+    crab.style.setProperty("--x", x + "px");
+    if (animate && !reduce && Math.abs(from - x) > 2) {
+      crab.classList.add("walking");
+      clearTimeout(moveCrab.t);
+      moveCrab.t = setTimeout(() => crab.classList.remove("walking"), 900);
+    }
+  }
+  addEventListener("resize", () => moveCrab(false));
+  document.fonts?.ready.then(() => moveCrab(false));
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let run = 0;
+
+  function select(i) {
+    buttons.forEach((b, j) => b.setAttribute("aria-pressed", String(i === j)));
+    desc.textContent = scenes[i].desc;
+    current = i;
+    moveCrab(true);
+  }
+
+  function full(s) {
+    return [prompt + s.cmd, ...s.out.map(o => o.html ?? o), prompt + caret].join("\n");
+  }
+
+  // Waits ms (and while the tab is hidden); returns false if a newer run took over.
+  async function tick(token, ms) {
+    await sleep(ms);
+    while (document.hidden && token === run) await sleep(400);
+    return token === run;
+  }
+
+  async function play(i, token) {
+    const s = scenes[i];
+    select(i);
+    if (reduce) { pre.innerHTML = full(s); return; }
+
+    pre.innerHTML = prompt + '<span class="cmd"></span>' + caret;
+    const cmd = pre.querySelector(".cmd");
+    for (const ch of s.cmd) {
+      if (!await tick(token, 35 + Math.random() * 55)) return;
+      cmd.textContent += ch;
+    }
+    if (!await tick(token, 380)) return;
+    pre.querySelector(".caret").remove();
+    let html = pre.innerHTML;
+    for (const o of s.out) {
+      if (!await tick(token, o.wait ?? 140)) return;
+      html += "\n" + (o.html ?? o);
+      pre.innerHTML = html;
+    }
+    if (!await tick(token, 200)) return;
+    pre.innerHTML = html + "\n" + prompt + caret;
+    if (!await tick(token, 2800)) return;
+    play((i + 1) % scenes.length, token);
+  }
+
+  function start(i) { play(i, ++run); }
+
+  start(reduce ? 1 : 0);
+})();
+</script>
+
+</body>
+</html>
