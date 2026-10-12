@@ -43,6 +43,8 @@ const state = {
   dismissing: new Set(), // "host/id" of exited sessions being dismissed
 };
 let newDialog = null;
+let hostDialog = null;
+let cfgHosts = null; // [{name,url,has_token}] from /api/config/hosts; null until loaded
 
 // ---------- helpers ----------
 
@@ -178,6 +180,7 @@ function parseRoute() {
     return { name: 'home' }; // a malformed hash, e.g. a stray "%"
   }
   if (parts[0] === 's' && parts.length === 3) return { name: 'session', host: parts[1], id: parts[2] };
+  if (parts[0] === 'hosts') return { name: 'hosts' };
   if (parts[0] === 'new') return { name: 'new', host: parts[1] || null };
   return { name: 'home' };
 }
@@ -192,6 +195,7 @@ function onRoute() {
   } else {
     closeSession();
   }
+  if (r.name === 'hosts') loadCfgHosts();
   render();
 }
 
@@ -216,13 +220,15 @@ function topbar() {
     h('a', { class: 'brand', href: '#/', 'data-key': 'brand' }, h('span', { class: 'wordmark' }, 'claw', h('span', { class: 'sh' }, 'sh')), h('span', { class: 'mono small muted' }, 'hub')),
     h('div', { class: 'grow' }),
     liveBadge(),
+    h('a', { class: 'btn ghost small', href: '#/hosts', 'data-key': 'hosts' }, 'Machines'),
     canCreate ? h('a', { class: 'btn primary', href: '#/new', 'data-key': 'new' }, icon('plus'), 'New session') : null));
 }
 
 function renderHome() {
   const ov = state.overview;
   let body;
-  if (!ov) body = h('p', { class: 'muted' }, 'Looking for your machines…');
+  if (parseRoute().name === 'hosts') body = hostsPage(ov);
+  else if (!ov) body = h('p', { class: 'muted' }, 'Looking for your machines…');
   else if (ov.hosts.length === 0) body = firstRun(ov);
   else body = [configError(ov), ...dashboard(ov)];
   keepFocus(() => app.replaceChildren(topbar(), h('main', { class: 'page' }, body)));
@@ -319,13 +325,14 @@ function firstRun(ov) {
   return h('div', { class: 'first-run' },
     configError(ov),
     h('h1', {}, 'No machines yet'),
-    h('p', { class: 'muted' }, 'clawsh shows the machines listed in your hosts file. Add one in three steps:'),
+    h('p', { class: 'muted' }, 'clawsh shows the machines listed in your hosts file. You can add one on the Machines page, or by hand in three steps:'),
     h('ol', { class: 'steps' },
       step(1, 'On that machine, run ', h('code', {}, 'clawsh agent')),
       step(2, 'Copy its access key with ', h('code', {}, 'clawsh token')),
       step(3, 'Add it to ', h('code', {}, ov.config_path), ' on this computer:',
         h('pre', { class: 'snippet' }, '[[host]]\nname  = "desk"\nurl   = "http://192.168.1.20:7420"\ntoken = "paste the access key here"'))),
-    h('p', { class: 'small muted' }, 'This page updates by itself when you save the file. Adding machines from this page is coming later.'));
+    h('p', {}, h('a', { class: 'btn primary', href: '#/hosts' }, 'Add a machine here instead')),
+    h('p', { class: 'small muted' }, 'This page also updates by itself when you save the file.'));
 }
 
 function renderSignedOut() {
@@ -334,6 +341,112 @@ function renderSignedOut() {
   app.replaceChildren(h('main', { class: 'page' }, h('div', { class: 'first-run' },
     h('h1', {}, KEY ? 'clawsh web was restarted' : 'Open clawsh from your terminal'),
     h('p', { class: 'muted' }, 'Open the link printed by clawsh web in your terminal.'))));
+}
+
+// ---------- machines (hosts.toml) ----------
+
+async function loadCfgHosts() {
+  try {
+    cfgHosts = await api('GET', '/api/config/hosts');
+  } catch (e) {
+    toast(`Couldn't load machines: ${e.message}`);
+    cfgHosts = cfgHosts || [];
+  }
+  if (parseRoute().name === 'hosts' && !hostDialog) render();
+}
+
+function hostsPage(ov) {
+  const live = (name) => ov && ov.hosts.find((x) => x.name === name);
+  const rows = (cfgHosts || []).map((x) => {
+    const o = live(x.name);
+    const status = !o ? null : o.online ? h('span', { class: 'pill' }, 'Online')
+      : h('span', { class: 'pill warn' }, o.error === AUTH_ERROR ? 'Key rejected' : 'Offline');
+    return h('li', { class: 'host-row' },
+      tile(x.name, !!(o && o.online)),
+      h('div', { class: 'grow' }, h('strong', {}, x.name), h('div', { class: 'mono small muted' }, hostAddr(x.url))),
+      status,
+      h('button', { class: 'btn ghost small', type: 'button', onclick: () => openHostDialog(x) }, 'Edit'),
+      h('button', { class: 'btn danger small', type: 'button', onclick: () => removeHost(x) }, 'Remove'));
+  });
+  return [
+    configError(ov),
+    h('div', { class: 'first-run' },
+      h('h1', {}, 'Machines'),
+      h('p', { class: 'muted' }, 'The machines in ', h('code', {}, ov ? ov.config_path : 'hosts.toml'),
+        '. Access keys are saved but never shown again. Saving here rewrites that file and drops any comments in it; the previous version is kept as ',
+        h('code', {}, 'hosts.toml.bak'), '.'),
+      cfgHosts === null ? h('p', { class: 'muted' }, 'Loading…')
+        : rows.length ? h('ul', { class: 'host-list' }, rows) : h('p', {}, 'No machines yet.'),
+      h('p', {}, h('button', { class: 'btn primary', type: 'button', onclick: () => openHostDialog(null) }, icon('plus'), 'Add machine'))),
+  ];
+}
+
+async function removeHost(x) {
+  const ok = await confirmDialog(`Remove ${x.name}?`, 'It is removed from hosts.toml. Its sessions keep running on that machine.', 'Remove');
+  if (!ok) return;
+  try {
+    await api('DELETE', `/api/config/hosts/${encodeURIComponent(x.name)}`);
+    await loadCfgHosts();
+  } catch (e) {
+    toast(`Couldn't remove ${x.name}: ${e.message}`);
+  }
+}
+
+// openHostDialog adds a machine (existing null) or edits one. The access key
+// field is write-only: empty keeps the saved key.
+function openHostDialog(existing) {
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  const result = h('p', { class: 'small', role: 'status' });
+  const save = h('button', { class: 'btn primary', type: 'submit' }, existing ? 'Save' : 'Add machine');
+  const test = h('button', { class: 'btn ghost', type: 'button' }, 'Test connection');
+  const read = () => {
+    const f = new FormData(form);
+    const t = (k) => String(f.get(k) || '').trim();
+    return { name: t('name'), url: t('url'), token: String(f.get('token') || '') };
+  };
+  const form = h('form', { class: 'dialog-body', onsubmit: async (e) => {
+    e.preventDefault();
+    save.disabled = true;
+    err.textContent = '';
+    try {
+      const body = read();
+      if (existing) await api('PUT', `/api/config/hosts/${encodeURIComponent(existing.name)}`, body);
+      else await api('POST', '/api/config/hosts', body);
+      hostDialog.close();
+      await loadCfgHosts();
+    } catch (ex) {
+      err.textContent = ex.message;
+      save.disabled = false;
+    }
+  } },
+    h('h2', {}, existing ? `Edit ${existing.name}` : 'Add a machine'),
+    h('div', { class: 'field' }, h('label', { for: 'hd-name' }, 'Name'),
+      h('input', { id: 'hd-name', name: 'name', class: 'input', value: existing ? existing.name : '', placeholder: 'desk', autocomplete: 'off', required: true })),
+    h('div', { class: 'field' }, h('label', { for: 'hd-url' }, 'Address'),
+      h('input', { id: 'hd-url', name: 'url', class: 'input mono', value: existing ? existing.url : '', placeholder: 'http://192.168.1.20:7420', autocomplete: 'off', required: true })),
+    h('div', { class: 'field' }, h('label', { for: 'hd-token' }, 'Access key'),
+      h('input', { id: 'hd-token', name: 'token', class: 'input mono', type: 'password', autocomplete: 'off',
+        placeholder: existing ? 'Leave empty to keep the saved key' : 'From clawsh token on that machine', required: !existing })),
+    result, err,
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => hostDialog.close() }, 'Cancel'),
+      test, save));
+  test.addEventListener('click', async () => {
+    const b = read();
+    result.textContent = 'Testing…';
+    err.textContent = '';
+    try {
+      const r = await api('POST', '/api/config/hosts/test', existing ? { ...b, name: existing.name } : b);
+      result.textContent = r.ok ? 'Connected.' : ({ unreachable: "Can't reach this address.", unauthorized: 'The machine rejected this access key.' }[r.error] || r.error);
+    } catch (ex) {
+      result.textContent = '';
+      err.textContent = ex.message;
+    }
+  });
+  hostDialog = h('dialog', { class: 'dialog', 'aria-label': existing ? 'Edit machine' : 'Add a machine' }, form);
+  hostDialog.addEventListener('close', () => { hostDialog.remove(); hostDialog = null; render(); });
+  document.body.append(hostDialog);
+  hostDialog.showModal();
 }
 
 // ---------- new session ----------

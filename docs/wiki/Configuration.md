@@ -29,6 +29,8 @@ token = "paste-token-from-laptop"
 - `name` and `url` are required; names must be unique. The name is what you type in `clawsh new desk` and `desk/<id>`.
 - A trailing `/` on `url` is ignored.
 - `token` is the output of `clawsh token` on that machine.
+- `url` must start with `http://` or `https://`.
+- `clawsh web` can edit this file for you (Machines page). When it saves, it re-encodes the file: comments and formatting are lost, and the previous contents are kept in `hosts.toml.bak` (mode `0600`).
 
 A template lives at `hosts.example.toml` in the repo.
 
