@@ -18,10 +18,17 @@
   --rx: 0deg;
   --ry: 0deg;
   position: relative;
-  margin: 56px auto 0;
+  width: 100%;
+  margin: 0 auto;
   max-width: 1040px;
   aspect-ratio: 1000 / 640;
   perspective: 1800px;
+  touch-action: pan-y; /* sideways swipes switch the view */
+}
+.showcase { margin-top: 56px; }
+@media (min-width: 960px) {
+  .showcase { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 36px; align-items: center; }
+  .showcase .tilt { grid-column: 1; }
 }
 .deck {
   position: absolute; inset: 0 12% 0 0;
@@ -114,7 +121,18 @@
 
 /* the three views double as the controls for the stack */
 .views { list-style: none; padding: 0; margin: 72px 0 0; display: grid; gap: 14px; }
-@media (min-width: 880px) { .views { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; } }
+@media (min-width: 600px) and (max-width: 959px) { .views { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+/* wide: a column beside the frames */
+@media (min-width: 960px) { .views { grid-column: 2; grid-row: 1 / span 2; margin: 0; } }
+/* phone: a strip that swipes along with the frames, the next card peeking in */
+@media (max-width: 599px) {
+  .views {
+    display: flex; gap: 12px; margin: 56px -16px 0; padding: 0 16px 4px;
+    overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+  }
+  .views::-webkit-scrollbar { display: none; }
+  .views li { flex: 0 0 84%; scroll-snap-align: center; }
+}
 .views button {
   display: flex; flex-direction: column; justify-content: flex-start; /* buttons center content by default */
   width: 100%; height: 100%;
@@ -241,6 +259,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .frame, .phone img { transition: none; }
+  .views { scroll-behavior: auto; }
 }
 </style>
 </head>
@@ -272,6 +291,7 @@
       <a class="quiet" href="#compare">How it compares to plain Claude Code</a>
     </div>
 
+    <div class="showcase">
     <div class="stage" id="stage">
       <div class="deck">
         <figure class="frame" data-view="0" data-slot="0">
@@ -312,6 +332,7 @@
         <span class="desc">Pick a machine and a folder. Claude starts there and keeps running after you close the browser.</span>
       </button></li>
     </ol>
+    </div>
     <p class="note">Works today in the browser on the computer running <code>clawsh web</code>. The page already fits a phone; opening it from one is next on the <a href="https://github.com/varogonz95/clawsh/issues/6">roadmap</a>.</p>
   </div>
 
@@ -584,14 +605,57 @@ token = "paste-token-from-desk"</pre>
 
   // Bring view v to the front; the others keep their relative order behind it.
   let order = [0, 1, 2];
-  function show(v) {
+  function show(v, fromStrip) {
     order = [v, ...order.filter(x => x !== v)];
     frames.forEach(f => f.dataset.slot = order.indexOf(+f.dataset.view));
     shots.forEach(s => s.classList.toggle("on", +s.dataset.view === v));
     buttons.forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.view === v)));
+    if (!fromStrip) follow();
   }
   buttons.forEach(b => b.addEventListener("click", () => show(+b.dataset.view)));
   frames.forEach(f => f.addEventListener("click", () => show(+f.dataset.view)));
+
+  // Phones: swipe the frames sideways to step through the views.
+  let swipe = null;
+  stage.addEventListener("pointerdown", e => {
+    if (e.pointerType !== "mouse") swipe = { x: e.clientX, y: e.clientY };
+  });
+  stage.addEventListener("pointerup", e => {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    show((order[0] + (dx < 0 ? 1 : 2)) % 3);
+  });
+  stage.addEventListener("pointercancel", () => swipe = null);
+
+  // On a phone the cards are a strip that scrolls sideways: keep it on the
+  // view in front, and bring forward whichever card it settles on.
+  const strip = document.querySelector(".views");
+  const cards = [...strip.children];
+  const scrolls = () => strip.scrollWidth > strip.clientWidth;
+  let settle = 0, steering = false;
+  function follow() {
+    if (!scrolls()) return;
+    const li = cards[order[0]];
+    const left = Math.max(0, Math.min(strip.scrollWidth - strip.clientWidth, li.offsetLeft - strip.offsetLeft - (strip.clientWidth - li.offsetWidth) / 2));
+    if (Math.abs(left - strip.scrollLeft) < 2) return;
+    steering = true;
+    strip.scrollTo({ left, behavior: reduce ? "auto" : "smooth" });
+  }
+  strip.addEventListener("scroll", () => {
+    clearTimeout(settle);
+    settle = setTimeout(() => {
+      if (steering) { steering = false; return; }
+      const mid = strip.scrollLeft + strip.clientWidth / 2;
+      let v = 0;
+      cards.forEach((li, i) => {
+        const c = li.offsetLeft - strip.offsetLeft + li.offsetWidth / 2;
+        if (Math.abs(c - mid) < Math.abs(cards[v].offsetLeft - strip.offsetLeft + cards[v].offsetWidth / 2 - mid)) v = i;
+      });
+      if (v !== order[0]) show(v, true);
+    }, 120);
+  });
 
   if (reduce) return; // the stack stays still in its resting pose
 
