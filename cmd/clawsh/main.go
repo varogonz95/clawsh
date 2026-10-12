@@ -6,6 +6,7 @@
 //	clawsh hosts                     check which configured agents are reachable
 //	clawsh ls [host]                 list sessions on all (or one) hosts
 //	clawsh new <host> [flags] [-- claude args...]
+//	clawsh run [-- claude args...]   start a session on the local agent and attach
 //	clawsh attach <host>/<id>        attach; Ctrl-] detaches
 //	clawsh kill <host>/<id>
 //	clawsh web                       browser UI for every host and session
@@ -57,6 +58,8 @@ func main() {
 		err = runList(args)
 	case "new":
 		err = runNew(args)
+	case "run":
+		err = runRun(args)
 	case "attach", "a":
 		err = runAttach(args)
 	case "kill", "rm":
@@ -71,6 +74,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", cmd)
 		usage()
 		os.Exit(2)
+	}
+	var ee exitError
+	if errors.As(err, &ee) {
+		os.Exit(ee.code)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "clawsh:", err)
@@ -93,6 +100,7 @@ hub side (run anywhere; reads hosts.toml):
   hosts                              reachability of every configured agent
   ls [host]                          list sessions
   new <host> [--dir d] [--name n] [--detached] [-- claude args...]
+  run [--name n] [-- claude args...] start a session on the local agent, here (no hosts.toml)
   attach <host>/<id>                 attach (id prefix ok); Ctrl-] detaches
   kill <host>/<id>                   stop and remove a session
   web [--listen 127.0.0.1:7421] [--no-open]
@@ -488,4 +496,67 @@ func age(t time.Time) string {
 	default:
 		return fmt.Sprintf("%dd", int(d.Hours()/24))
 	}
+}
+
+// exitError makes main exit with a specific code without printing anything.
+type exitError struct{ code int }
+
+func (e exitError) Error() string { return fmt.Sprintf("exit status %d", e.code) }
+
+func runRun(args []string) error {
+	fs := flag.NewFlagSet("run", flag.ExitOnError)
+	name := fs.String("name", "", "session name (default: dir basename)")
+	listen := fs.String("listen", ":7420", "local agent address")
+	tokenFile := fs.String("token-file", agent.DefaultTokenPath(), "agent token file")
+	pos, claudeArgs := parseInterspersed(fs, args)
+	if len(pos) != 0 {
+		return errors.New("usage: clawsh run [--name n] [--listen addr] [--token-file p] [-- claude args...]")
+	}
+	return runLocal(context.Background(), *listen, *tokenFile, *name, claudeArgs, hub.AttachExit)
+}
+
+// runLocal creates a session on the local agent in the current directory and
+// attaches to it. It returns exitError with claude's code when the session
+// exits, nil on detach.
+func runLocal(ctx context.Context, listen, tokenFile, name string, claudeArgs []string,
+	attach func(context.Context, *hub.Client, string) (*int, error)) error {
+	u, err := mcp.LocalURL(listen)
+	if err != nil {
+		return err
+	}
+	token, _, err := agent.LoadOrCreateToken(tokenFile)
+	if err != nil {
+		return err
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	c := hub.NewClient(hub.Host{Name: "local", URL: u, Token: token})
+	hctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	_, err = c.Health(hctx)
+	cancel()
+	if err != nil {
+		var he *hub.HTTPError
+		if errors.As(err, &he) {
+			return err // an agent answered but refused, e.g. a wrong token
+		}
+		return fmt.Errorf("no local agent at %s; start one with 'clawsh agent' or 'clawsh agent install-service'", u)
+	}
+	req := api.CreateRequest{Name: name, Dir: cwd, Args: claudeArgs}
+	if cols, rows, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+		req.Cols, req.Rows = cols, rows
+	}
+	s, err := c.Create(ctx, req)
+	if err != nil {
+		return err
+	}
+	code, err := attach(ctx, c, s.ID)
+	if err != nil {
+		return err
+	}
+	if code != nil && *code != 0 {
+		return exitError{*code}
+	}
+	return nil
 }

@@ -55,6 +55,26 @@ Alias: `list`. Lists sessions on every host, or just one. Columns: `TARGET`, `NA
 
 The session starts at your current terminal size.
 
+### `clawsh run [flags] [-- claude args...]`
+
+Like plain `claude` in the current terminal, but the session belongs to the local agent: it needs no `hosts.toml` entry, can be attached from any hub (`clawsh attach local/<id>`) and survives closing the terminal. Starts in the current directory and attaches at the current terminal size. **Ctrl-]** detaches and exits 0; when claude exits, `clawsh run` exits with its exit code. It does not start an agent: if none answers it fails with `no local agent at <url>; start one with 'clawsh agent' or 'clawsh agent install-service'`.
+
+| Flag | Default | |
+|---|---|---|
+| `--name` | basename of the directory | Session name shown in `ls` |
+| `--listen` | `:7420` | Address of the local agent |
+| `--token-file` | per-user token file | Agent token |
+
+To use it in place of `claude`:
+
+```sh
+alias claude='clawsh run --'          # bash / zsh
+```
+
+```powershell
+function claude { clawsh run -- @args }   # PowerShell profile
+```
+
 ### `clawsh attach <host>/<id>`
 
 Alias: `a`. Takes over your terminal until you press **Ctrl-]**, the session exits, or the connection drops. Needs an interactive terminal. Terminal resizes are forwarded.
