@@ -139,8 +139,17 @@ a.row:hover { background: var(--raised); color: inherit; }
 .chip .icon { width: 14px; height: 14px; }
 .chip .mono { font-size: 13px; }
 .chip.ok { background: var(--ok-bg); border-color: var(--ok-bg); color: var(--ok-ink); }
-.term { flex: 1 1 auto; min-height: 240px; background: var(--term); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; overflow: hidden; }
-.term .xterm { height: 100%; }
+.term { flex: 1 1 auto; min-height: 240px; position: relative; background: var(--term); box-shadow: inset 0 0 0 1px var(--rule); border-radius: 12px; overflow: hidden; }
+/* Padding sits on .xterm, not .term, and .term has no border: FitAddon sizes the grid from .term's
+   computed box minus .xterm's padding, so padding or border on .term makes the last rows clip. */
+.term .xterm { height: 100%; padding: 12px 14px; }
+/* The native scrollbar is hidden (it took columns and overlapped the text); .scrollthumb is an overlay
+   that app.js shows only while the buffer scrolls. */
+.term .xterm-viewport { scrollbar-width: none; }
+.term .xterm-viewport::-webkit-scrollbar { display: none; }
+.scrollthumb { position: absolute; right: 4px; width: 8px; min-height: 28px; border-radius: 999px; background: rgba(217, 226, 234, 0.28); opacity: 0; transition: opacity 0.25s, background-color 0.15s; z-index: 5; touch-action: none; }
+.scrollthumb.on { opacity: 1; }
+.scrollthumb:hover, .scrollthumb.drag { background: rgba(217, 226, 234, 0.6); }
 .session > p { margin: 0; }
 .banner { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px; border-radius: 10px; background: var(--raised); border: 1px solid var(--rule-strong); }
 .banner.config-error { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-bg); margin-bottom: 24px; overflow-wrap: anywhere; }
