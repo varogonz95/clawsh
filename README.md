@@ -28,7 +28,7 @@ curl -fsSL https://varogonz95.github.io/clawsh/install.sh | sh   # Linux, macOS
 irm https://varogonz95.github.io/clawsh/install.ps1 | iex   # Windows PowerShell
 ```
 
-With Node 18+: `npm i -g clawsh`, or run it without installing: `npx clawsh ls`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source, see [How to build locally](#how-to-build-locally).
+With Node 18+: `npm i -g clawsh`, or run it without installing: `npx clawsh ls`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source, see [Building from source](#building-from-source).
 
 On **each machine that should host sessions**:
 
@@ -51,7 +51,7 @@ clawsh attach desk/8158                        # id prefix is enough
 clawsh kill desk/8158
 ```
 
-## How to build locally
+## Building from source
 
 Needs Go 1.22+ and `make`. No cgo, so no C toolchain is required.
 
