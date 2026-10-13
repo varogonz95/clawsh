@@ -49,6 +49,8 @@ jobs:
 
       # One archive per platform, each unpacking into its own directory:
       # clawsh_<version>_<os>_<arch>/{clawsh[.exe],README.md,LICENSE}
+      # plus the raw binaries (clawsh-<os>-<arch>[.exe]), which the npm
+      # launcher downloads on first run.
       - name: Package
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -69,6 +71,7 @@ jobs:
               tar -C "$work" -czf "out/$name.tar.gz" "$name"
             fi
           done
+          cp dist/clawsh-* out/
           (cd out && sha256sum * > checksums.txt)
           ls -l out
 
@@ -87,8 +90,9 @@ jobs:
           gh release create "$GITHUB_REF_NAME" out/* \
             --verify-tag --generate-notes --title "clawsh ${GITHUB_REF_NAME}" "${flags[@]}"
 
-  # The same binaries as the GitHub release, as npm packages: one per platform
-  # (clawsh-<os>-<cpu>) plus the "clawsh" launcher that depends on them.
+  # The "clawsh" npm launcher. It carries the SHA-256 of every binary and
+  # downloads its platform's one from the release above on first run, so it
+  # must publish after the release assets are up.
   npm:
     needs: release
     runs-on: ubuntu-latest
@@ -106,20 +110,16 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Stage packages
+      - name: Stage package
         run: node npm/build.mjs "${GITHUB_REF_NAME#v}" dist out/npm
 
-      # Platform packages first, so the launcher never points at a missing one.
-      # Versions already on npm are skipped, so a re-run finishes the job.
+      # A version already on npm is skipped, so re-running the job is safe.
       - name: Publish
         run: |
           version="${GITHUB_REF_NAME#v}"
           tag=latest; [[ $version == *-* ]] && tag=next
-          for dir in out/npm/clawsh-*/ out/npm/clawsh/; do
-            name=$(jq -r .name "$dir/package.json")
-            if npm view "$name@$version" version >/dev/null 2>&1; then
-              echo "$name@$version is already published, skipping"
-              continue
-            fi
-            npm publish "$dir" --access public --tag "$tag"
-          done
+          if npm view "clawsh@$version" version >/dev/null 2>&1; then
+            echo "clawsh@$version is already published, skipping"
+            exit 0
+          fi
+          npm publish out/npm/clawsh/ --access public --tag "$tag"

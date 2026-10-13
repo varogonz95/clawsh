@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Runs the clawsh binary for this platform with the same arguments.
-// The binary comes from the matching optional dependency (clawsh-<os>-<cpu>);
-// lib/resolve.js covers installs that skipped it.
+// lib/resolve.js finds it, downloading it from the GitHub release on first run.
 "use strict";
 
 const { spawnSync } = require("node:child_process");

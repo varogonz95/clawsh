@@ -1,32 +1,32 @@
 // Finds the clawsh binary for this platform, in order:
 //   1. CLAWSH_BINARY_PATH, if set;
-//   2. the installed optional dependency clawsh-<os>-<cpu>;
-//   3. a copy downloaded earlier into the user cache;
-//   4. a fresh download of that same package from the npm registry,
-//      checked against the registry's sha512 integrity before use.
-// Step 4 covers installs that skip optional dependencies (pnpm/bun policies,
-// --omit=optional, a lockfile made on another OS).
+//   2. a copy downloaded earlier into the user cache;
+//   3. a fresh download of the raw binary attached to the matching GitHub
+//      release (v<version>), checked against the SHA-256 that build.mjs wrote
+//      into lib/checksums.json when this package was published.
+// The checksums ship inside the npm package, so a release asset that changed
+// after publishing is refused rather than run.
 "use strict";
 
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const zlib = require("node:zlib");
 
 const VERSION = require("../package.json").version;
-const PLATFORMS = {
-  "darwin-arm64": true, "darwin-x64": true,
-  "linux-arm64": true, "linux-x64": true,
-  "win32-arm64": true, "win32-x64": true,
-};
+const RELEASES = "https://github.com/varogonz95/clawsh/releases/download";
 
-function platformPackage(platform = process.platform, arch = process.arch) {
-  const key = `${platform}-${arch}`;
-  if (!PLATFORMS[key]) {
-    throw new Error(`no prebuilt binary for ${key}; build from source: https://github.com/varogonz95/clawsh`);
+// Node platform/arch -> Go GOOS/GOARCH, as named by `make dist`.
+const GOOS = { darwin: "darwin", linux: "linux", win32: "windows" };
+const GOARCH = { arm64: "arm64", x64: "amd64" };
+
+// The release asset for this machine, e.g. clawsh-linux-amd64 or clawsh-windows-arm64.exe.
+function assetName(platform = process.platform, arch = process.arch) {
+  const goos = GOOS[platform], goarch = GOARCH[arch];
+  if (!goos || !goarch) {
+    throw new Error(`no prebuilt binary for ${platform}-${arch}; build from source: https://github.com/varogonz95/clawsh`);
   }
-  return `clawsh-${key}`;
+  return `clawsh-${goos}-${goarch}${goos === "windows" ? ".exe" : ""}`;
 }
 
 function binName(platform = process.platform) {
@@ -41,54 +41,41 @@ function cacheDir() {
   return path.join(process.env.XDG_CACHE_HOME || path.join(home, ".cache"), "clawsh");
 }
 
-function registryURL() {
-  // npm and npx export the configured registry to the scripts they run.
-  const r = process.env.npm_config_registry || "https://registry.npmjs.org/";
-  return r.endsWith("/") ? r : r + "/";
+// Where release assets are downloaded from; CLAWSH_DOWNLOAD_BASE points at a
+// mirror laid out the same way (<base>/v<version>/<asset>).
+function downloadURL(asset) {
+  const base = (process.env.CLAWSH_DOWNLOAD_BASE || RELEASES).replace(/\/+$/, "");
+  return `${base}/v${VERSION}/${asset}`;
 }
 
-// Returns the bytes of package/bin/<name> from an npm package tarball (.tgz).
-function extractFromTarball(tgz, name) {
-  const tar = zlib.gunzipSync(tgz);
-  const want = `package/bin/${name}`;
-  for (let off = 0; off + 512 <= tar.length; ) {
-    const header = tar.subarray(off, off + 512);
-    if (header.every((b) => b === 0)) break; // end of archive
-    const field = (start, len) => header.toString("utf8", start, start + len).replace(/\0.*$/s, "");
-    const size = parseInt(field(124, 12).trim() || "0", 8);
-    const prefix = field(345, 155);
-    const entry = prefix ? `${prefix}/${field(0, 100)}` : field(0, 100);
-    const type = String.fromCharCode(header[156] || 48);
-    const body = off + 512;
-    if (entry === want && (type === "0" || type === "\0")) return tar.subarray(body, body + size);
-    off = body + Math.ceil(size / 512) * 512;
+function expectedSHA256(asset) {
+  let sums;
+  try {
+    sums = require("./checksums.json");
+  } catch {
+    throw new Error("this clawsh package has no checksums (a source checkout, not a published release)");
   }
-  throw new Error(`${want} not found in package tarball`);
+  if (!sums[asset]) throw new Error(`no checksum for ${asset} in this package`);
+  return sums[asset];
 }
 
-function verifyIntegrity(buf, integrity) {
-  const [algo, expected] = String(integrity || "").split("-", 2);
-  if (algo !== "sha512" || !expected) throw new Error(`unsupported integrity value: ${integrity}`);
-  const actual = crypto.createHash("sha512").update(buf).digest("base64");
-  if (actual !== expected) throw new Error("downloaded package failed its sha512 integrity check");
+function verifySHA256(buf, expected) {
+  const actual = crypto.createHash("sha256").update(buf).digest("hex");
+  if (actual !== expected) throw new Error("downloaded binary failed its SHA-256 check");
 }
 
-async function fetchOK(url, what) {
+async function download(asset, dest) {
+  const url = downloadURL(asset);
+  const expected = expectedSHA256(asset);
   let res;
   try {
-    res = await fetch(url);
+    res = await fetch(url); // follows GitHub's redirect to its download host
   } catch (err) {
-    throw new Error(`could not download ${what} from ${url}: ${err.cause?.message || err.message}`);
+    throw new Error(`could not download ${url}: ${err.cause?.message || err.message}`);
   }
-  if (!res.ok) throw new Error(`could not download ${what} from ${url}: HTTP ${res.status}`);
-  return res;
-}
-
-async function download(pkg, dest) {
-  const meta = await (await fetchOK(`${registryURL()}${pkg}/${VERSION}`, `${pkg}@${VERSION} metadata`)).json();
-  const tgz = Buffer.from(await (await fetchOK(meta.dist.tarball, `${pkg}@${VERSION}`)).arrayBuffer());
-  verifyIntegrity(tgz, meta.dist.integrity);
-  const bin = extractFromTarball(tgz, path.basename(dest));
+  if (!res.ok) throw new Error(`could not download ${url}: HTTP ${res.status}`);
+  const bin = Buffer.from(await res.arrayBuffer());
+  verifySHA256(bin, expected);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const tmp = `${dest}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, bin, { mode: 0o755 });
@@ -98,24 +85,17 @@ async function download(pkg, dest) {
 async function resolveBinary() {
   if (process.env.CLAWSH_BINARY_PATH) return process.env.CLAWSH_BINARY_PATH;
 
-  const pkg = platformPackage();
-  const name = binName();
-  try {
-    return require.resolve(`${pkg}/bin/${name}`);
-  } catch {
-    // optional dependency not installed; fall through
-  }
-
-  const cached = path.join(cacheDir(), VERSION, pkg, name);
+  const asset = assetName();
+  const cached = path.join(cacheDir(), VERSION, binName());
   if (fs.existsSync(cached)) return cached;
 
-  process.stderr.write(`clawsh: ${pkg} isn't installed; downloading it once from the npm registry...\n`);
+  process.stderr.write(`clawsh: downloading the ${asset} binary once from the v${VERSION} GitHub release...\n`);
   try {
-    await download(pkg, cached);
+    await download(asset, cached);
   } catch (err) {
-    throw new Error(`${err.message}\nInstall ${pkg}@${VERSION} yourself, or set CLAWSH_BINARY_PATH to a clawsh binary.`);
+    throw new Error(`${err.message}\nDownload ${asset} from https://github.com/varogonz95/clawsh/releases/tag/v${VERSION} yourself and set CLAWSH_BINARY_PATH to it.`);
   }
   return cached;
 }
 
-module.exports = { resolveBinary, platformPackage, binName, extractFromTarball, verifyIntegrity, cacheDir };
+module.exports = { resolveBinary, assetName, binName, cacheDir, downloadURL, verifySHA256 };

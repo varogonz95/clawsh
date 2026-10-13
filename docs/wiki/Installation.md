@@ -39,9 +39,9 @@ npm i -g clawsh      # installs the clawsh command
 npx clawsh ls        # or run it without installing
 ```
 
-The `clawsh` package is a small launcher. npm also installs the one platform package that matches your machine (`clawsh-linux-x64`, `clawsh-darwin-arm64`, `clawsh-win32-x64`, ...), which holds the real binary. If that package was skipped (pnpm or bun blocking it, `--omit=optional`, a lockfile made on another OS), the first run downloads it from your npm registry, checks it against the registry's sha512, and caches it.
+The `clawsh` package is a small launcher with no binaries in it. On first run it downloads the binary for your machine from the matching [GitHub release](https://github.com/varogonz95/clawsh/releases) (the same file as in the archives below), checks it against the SHA-256 that shipped inside the npm package, and caches it. Later runs use the cached copy and need no network. Nothing runs at install time, so `--ignore-scripts`, pnpm and bun all work.
 
-Behind a proxy or a registry that blocks the download, point the launcher at a binary you already have: `CLAWSH_BINARY_PATH=/path/to/clawsh`. On Node 24+, `NODE_USE_ENV_PROXY=1` makes the download honor `HTTPS_PROXY`. Downloaded binaries are cached in `~/.cache/clawsh` (`$XDG_CACHE_HOME/clawsh`), `~/Library/Caches/clawsh` on macOS or `%LOCALAPPDATA%\clawsh\cache` on Windows; set `CLAWSH_CACHE_DIR` to use another directory.
+The first run needs to reach `github.com`. Behind a proxy or a firewall that blocks it, point the launcher at a binary you already have: `CLAWSH_BINARY_PATH=/path/to/clawsh`, or at a mirror laid out like the releases page (`<base>/v<version>/clawsh-<os>-<arch>[.exe]`): `CLAWSH_DOWNLOAD_BASE=https://mirror.example/clawsh`. The checksum is still enforced for a mirror. On Node 24+, `NODE_USE_ENV_PROXY=1` makes the download honor `HTTPS_PROXY`. Downloaded binaries are cached in `~/.cache/clawsh` (`$XDG_CACHE_HOME/clawsh`), `~/Library/Caches/clawsh` on macOS or `%LOCALAPPDATA%\clawsh\cache` on Windows; set `CLAWSH_CACHE_DIR` to use another directory.
 
 ## Prebuilt binaries
 

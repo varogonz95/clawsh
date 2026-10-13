@@ -1,7 +1,10 @@
-// Stages the npm packages for a release from the binaries in dist/:
+// Stages the npm package for a release from the binaries in dist/:
 //   node npm/build.mjs <version> [distDir] [outDir]
-// writes outDir/clawsh-<os>-<cpu>/ (one binary each, limited to its os/cpu)
-// and outDir/clawsh/ (the launcher), all stamped with <version>.
+// writes outDir/clawsh/ (the launcher) stamped with <version>, plus
+// lib/checksums.json: the SHA-256 of every dist/ binary. The release workflow
+// attaches those same binaries to the GitHub release, and the launcher
+// downloads its platform's one on first run and checks it against this file.
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,66 +16,31 @@ if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version || "")) {
   process.exit(2);
 }
 
-// Go GOOS/GOARCH (Makefile PLATFORMS) -> npm os/cpu.
-const targets = [
-  ["darwin", "arm64", "darwin", "arm64"],
-  ["darwin", "amd64", "darwin", "x64"],
-  ["linux", "arm64", "linux", "arm64"],
-  ["linux", "amd64", "linux", "x64"],
-  ["windows", "arm64", "win32", "arm64"],
-  ["windows", "amd64", "win32", "x64"],
+// Every platform the launcher supports (Makefile PLATFORMS), named as in dist/.
+const assets = [
+  "clawsh-darwin-arm64",
+  "clawsh-darwin-amd64",
+  "clawsh-linux-arm64",
+  "clawsh-linux-amd64",
+  "clawsh-windows-arm64.exe",
+  "clawsh-windows-amd64.exe",
 ];
 
-const main = JSON.parse(fs.readFileSync(path.join(here, "clawsh", "package.json"), "utf8"));
-const license = path.join(here, "..", "LICENSE");
-const write = (file, data) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, data);
-};
-fs.rmSync(outDir, { recursive: true, force: true });
-
-for (const [goos, goarch, os, cpu] of targets) {
-  const name = `clawsh-${os}-${cpu}`;
-  const exe = goos === "windows" ? ".exe" : "";
-  const src = path.join(distDir, `clawsh-${goos}-${goarch}${exe}`);
+const checksums = {};
+for (const asset of assets) {
+  const src = path.join(distDir, asset);
   if (!fs.existsSync(src)) throw new Error(`missing ${src}; run make dist first`);
-  const dir = path.join(outDir, name);
-  fs.mkdirSync(path.join(dir, "bin"), { recursive: true });
-  fs.copyFileSync(src, path.join(dir, "bin", `clawsh${exe}`));
-  fs.chmodSync(path.join(dir, "bin", `clawsh${exe}`), 0o755);
-  write(path.join(dir, "package.json"), JSON.stringify({
-    name,
-    version,
-    description: `The clawsh binary for ${os} ${cpu}. Install "clawsh" instead; it picks this up.`,
-    license: main.license,
-    homepage: main.homepage,
-    repository: main.repository,
-    os: [os],
-    cpu: [cpu],
-    files: ["bin"],
-    preferUnplugged: true,
-  }, null, 2) + "\n");
-  write(path.join(dir, "README.md"), [
-    `# ${name}`,
-    "",
-    `The prebuilt \`clawsh\` binary for ${os} ${cpu}. Don't install this directly: \`npm i -g clawsh\` installs it for you.`,
-    "",
-    "clawsh starts Claude Code sessions on any machine in your network and lets you attach to them from any terminal or browser.",
-    "",
-    `- Source and docs: ${main.repository.url.replace(/^git\+/, "").replace(/\.git$/, "")}`,
-    `- The same binary, with checksums: ${main.repository.url.replace(/^git\+/, "").replace(/\.git$/, "")}/releases/tag/v${version}`,
-    "- License: Apache-2.0 with the Commons Clause (free to use, modify and share; not to sell). See LICENSE.",
-    "",
-  ].join("\n"));
-  fs.copyFileSync(license, path.join(dir, "LICENSE"));
+  checksums[asset] = crypto.createHash("sha256").update(fs.readFileSync(src)).digest("hex");
 }
 
-const mainDir = path.join(outDir, "clawsh");
-fs.cpSync(path.join(here, "clawsh"), mainDir, { recursive: true });
-main.version = version;
-for (const dep of Object.keys(main.optionalDependencies)) main.optionalDependencies[dep] = version;
-write(path.join(mainDir, "package.json"), JSON.stringify(main, null, 2) + "\n");
-fs.copyFileSync(path.join(here, "..", "README.md"), path.join(mainDir, "README.md"));
-fs.copyFileSync(license, path.join(mainDir, "LICENSE"));
+fs.rmSync(outDir, { recursive: true, force: true });
+const dir = path.join(outDir, "clawsh");
+fs.cpSync(path.join(here, "clawsh"), dir, { recursive: true });
+const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
+pkg.version = version;
+fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
+fs.writeFileSync(path.join(dir, "lib", "checksums.json"), JSON.stringify(checksums, null, 2) + "\n");
+fs.copyFileSync(path.join(here, "..", "README.md"), path.join(dir, "README.md"));
+fs.copyFileSync(path.join(here, "..", "LICENSE"), path.join(dir, "LICENSE"));
 
-console.log(`staged clawsh ${version}: ${targets.length} platform packages + launcher in ${outDir}`);
+console.log(`staged clawsh ${version} in ${dir} (checksums for ${assets.length} binaries)`);

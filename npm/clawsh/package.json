@@ -18,13 +18,5 @@
   ],
   "engines": {
     "node": ">=18"
-  },
-  "optionalDependencies": {
-    "clawsh-darwin-arm64": "0.0.0",
-    "clawsh-darwin-x64": "0.0.0",
-    "clawsh-linux-arm64": "0.0.0",
-    "clawsh-linux-x64": "0.0.0",
-    "clawsh-win32-arm64": "0.0.0",
-    "clawsh-win32-x64": "0.0.0"
   }
 }
