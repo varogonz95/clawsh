@@ -80,6 +80,11 @@ func (s *Server) routes() *http.ServeMux {
 	mux.Handle("GET /api/hosts/{host}/dirs/recent", s.api(s.recentDirs))
 	mux.Handle("DELETE /api/hosts/{host}/sessions/{id}", s.api(s.remove))
 	mux.Handle("GET /api/hosts/{host}/sessions/{id}/attach", s.api(s.attach))
+	mux.Handle("GET /api/config/hosts", s.api(s.listHosts))
+	mux.Handle("POST /api/config/hosts", s.api(s.addHost))
+	mux.Handle("POST /api/config/hosts/test", s.api(s.testHost))
+	mux.Handle("PUT /api/config/hosts/{name}", s.api(s.editHost))
+	mux.Handle("DELETE /api/config/hosts/{name}", s.api(s.deleteHost))
 	// Unknown /api paths still demand the key, and answer in JSON.
 	mux.Handle("/api/", s.api(func(w http.ResponseWriter, _ *http.Request) {
 		writeErr(w, http.StatusNotFound, errors.New("not found"))

@@ -70,6 +70,7 @@ kbd {
 .top nav { display: flex; gap: 22px; }
 .top nav a { text-decoration: none; color: var(--ink-soft); }
 .top nav a:hover { color: var(--ink); text-decoration: underline; }
+@media (max-width: 479px) { .top { gap: 16px; } .top nav { gap: 14px; font-size: .95rem; } }
 
 /* hero */
 .hero { padding-block: 40px 88px; }
@@ -129,3 +130,17 @@ footer a { color: var(--ink-soft); }
 @media (prefers-reduced-motion: reduce) {
   .btn:hover, .btn:active { transform: none; }
 }
+
+/* dark code blocks; the terminal is dark in both themes */
+.code {
+  margin: 0;
+  padding: 16px 18px;
+  background: var(--deep);
+  color: var(--deep-fg);
+  border-radius: 12px;
+  font-size: .82rem;
+  line-height: 1.75;
+  overflow-x: auto;
+}
+.code .dim { color: var(--deep-dim); }
+.top nav a[aria-current="page"] { color: var(--ink); }

@@ -106,8 +106,10 @@ function page({ file, title, html }) {
 <header class="wrap top">
   <a class="mark" href="../" aria-label="clawsh home">claw<span class="sh" aria-hidden="true">sh</span></a>
   <nav aria-label="Main">
+    <a href="../#web">Web UI</a>
+    <a href="../#install">Install</a>
+    <a href="../cli.html">CLI</a>
     <a href="./" aria-current="page">Docs</a>
-    <a href="../app.html">Web UI</a>
     <a href="${REPO}">GitHub</a>
   </nav>
 </header>
@@ -129,7 +131,7 @@ ${html}
 
 <footer>
   <div class="wrap">
-    <span><span class="mark">claw<span class="sh">sh</span></span> &nbsp;A cross-machine shell for Claude Code. Not affiliated with Anthropic.</span>
+    <span><span class="mark">claw<span class="sh">sh</span></span> &nbsp;A cross-machine manager for Claude Code. Not affiliated with Anthropic.</span>
     <span><a href="./">Docs</a> &nbsp; <a href="${REPO}/blob/main/LICENSE">License</a> &nbsp; <a href="${REPO}">GitHub</a></span>
   </div>
 </footer>
