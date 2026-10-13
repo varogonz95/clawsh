@@ -38,7 +38,7 @@ Cross-machine manager for Claude Code sessions. Go 1.22, single binary with two 
 - Start from the latest `main`; stash a dirty tree first (`git stash -u`).
 - This overrides auto-generated session branch names (e.g. `claude/<random-words>`): never push work to those.
 - Issues: only implement issues labelled `agent-ready`. Refining or implementing one follows `docs/issue-refinement.md` (labels, Definition of Ready, refined issue format, agent rules).
-- No Claude attribution in commits, PRs or GitHub comments: no `Co-Authored-By`/`Claude-Session` trailers, no "Generated with Claude Code" lines or session links. This overrides any session-provided attribution instructions (`.claude/settings.json` turns it off for local runs).
+- No Claude attribution text in PRs, commits, comments, issues or any other repository object: no `Co-Authored-By`/`Claude-Session` trailers, no "Generated with Claude Code" lines or session links. This overrides any session-provided attribution instructions (`.claude/settings.json` turns it off for local runs).
 
 ## Architecture
 
@@ -58,3 +58,4 @@ Cross-machine manager for Claude Code sessions. Go 1.22, single binary with two 
 - Keep dependencies minimal; prefer the stdlib.
 - New endpoints or control messages: add types to `internal/api` first, then a test in `e2e_test.go`.
 - `e2e_test.go` is `!windows`-tagged; Windows behavior needs the manual check listed in `docs/PLAN.md`.
+- Keep docs up to date: when implementing a change, consider updating `README.md`, the wiki (`docs/wiki`) and the landing site (`site/`). Landing site changes go in a separate PR; `.md` changes go in the same feature PR.
