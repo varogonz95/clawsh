@@ -11,6 +11,8 @@ const AUTH_ERROR = 'access key rejected'; // hub.ErrMsgAuth
 const CLOSE_NOT_FOUND = 4404; // web.closeNotFound
 const CLOSE_UNREACHABLE = 4502; // web.closeUnreachable
 const KEY_STORE = 'clawsh_key';
+const SIDEBAR_STORE = 'clawsh.sidebar'; // 'open' | 'closed'
+const NARROW = '(max-width: 900px)'; // the sessions panel starts collapsed and overlays the terminal
 
 // takeKey moves the access key from the opened link (?k=…) into
 // localStorage and out of the address bar. localStorage is scoped to this
@@ -32,6 +34,7 @@ const ICONS = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  panel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>',
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
 
@@ -151,6 +154,8 @@ function keepFocus(rerender) {
 }
 
 function go(hash) { location.hash = hash; }
+
+function sessionHash(host, id) { return `#/s/${encodeURIComponent(host)}/${encodeURIComponent(id)}`; }
 
 // ---------- live data ----------
 
@@ -279,7 +284,7 @@ function sessionRow(hostName, s) {
         disabled: state.dismissing.has(`${hostName}/${s.id}`), onclick: () => dismiss(hostName, s),
       }, 'Dismiss'));
   }
-  return h('a', { class: 'row', href: `#/s/${encodeURIComponent(hostName)}/${encodeURIComponent(s.id)}`, 'data-key': `row:${hostName}/${s.id}` },
+  return h('a', { class: 'row', href: sessionHash(hostName, s.id), 'data-key': `row:${hostName}/${s.id}` },
     h('span', { class: 'dot ok' }),
     h('span', { class: 'grow' },
       h('span', { class: 'row-title' }, label),
@@ -456,7 +461,10 @@ function syncNewDialog(r) {
   if (r.name !== 'new' && newDialog) newDialog.close();
 }
 
-function openNewDialog(preselect) {
+// openNewDialog shows the start-a-session dialog. onCreated(host, id) runs after
+// a session was created; the default opens it. Only the #/new route navigates
+// away when the dialog closes, so the session view can open it in place.
+function openNewDialog(preselect, onCreated = (host, id) => go(sessionHash(host, id))) {
   const hosts = state.overview.hosts;
   const chosen = hosts.find((x) => x.name === preselect && x.online) || hosts.find((x) => x.online);
   const err = h('p', { class: 'form-error', role: 'alert' });
@@ -464,7 +472,7 @@ function openNewDialog(preselect) {
   const setHelp = (name) => { dirHelp.textContent = `A folder on ${name}. Leave it empty to use the home folder.`; };
   const submit = h('button', { class: 'btn primary', type: 'submit' }, 'Start session');
 
-  const form = h('form', { class: 'dialog-body', onsubmit: (e) => { e.preventDefault(); submitNew(form, err, submit); } },
+  const form = h('form', { class: 'dialog-body', onsubmit: (e) => { e.preventDefault(); submitNew(form, err, submit, onCreated); } },
     h('div', {},
       h('h2', {}, 'Start a Claude session'),
       h('p', { class: 'muted' }, 'Claude starts on the machine you pick and keeps running after you close the browser.')),
@@ -509,7 +517,7 @@ function estimateTermSize() {
   return { cols: Math.max(40, Math.floor(width / 8.4)), rows: Math.max(12, Math.floor(height / 17)) };
 }
 
-async function submitNew(form, err, submit) {
+async function submitNew(form, err, submit, onCreated) {
   const data = new FormData(form);
   const host = data.get('host');
   if (!host) { err.textContent = 'Pick a machine.'; return; }
@@ -526,7 +534,7 @@ async function submitNew(form, err, submit) {
       cols: size.cols,
       rows: size.rows,
     });
-    go(`#/s/${encodeURIComponent(host)}/${encodeURIComponent(s.id)}`);
+    onCreated(host, s.id);
     if (newDialog) newDialog.close();
   } catch (e) {
     err.textContent = e.message;
@@ -558,6 +566,8 @@ function openSession(host, id) {
     chromeEl: h('div', { class: 'session-chrome' }),
     bannerEl: h('div'),
     termEl: h('div', { class: 'term' }),
+    panelEl: h('aside', { class: 'sessions-panel', 'aria-label': 'Sessions' }),
+    panelOpen: initialPanelOpen(),
   };
   state.view = v;
   app.replaceChildren(
@@ -565,10 +575,12 @@ function openSession(host, id) {
       h('a', { class: 'back', href: '#/', 'data-key': 'back' }, icon('back'), 'All machines'),
       h('div', { class: 'grow' }),
       v.liveSlot)),
-    h('div', { class: 'session' },
-      v.chromeEl, v.bannerEl, v.termEl,
-      h('p', { class: 'small muted' },
-        `Leaving this page only disconnects you. Claude keeps working on ${host}, and you can come back any time.`)));
+    h('div', { class: 'session-wrap' },
+      v.panelEl,
+      h('div', { class: 'session' },
+        v.chromeEl, v.bannerEl, v.termEl,
+        h('p', { class: 'small muted' },
+          `Leaving this page only disconnects you. Claude keeps working on ${host}, and you can come back any time.`))));
   renderSessionChrome();
   term.open(v.termEl);
   fit.fit();
@@ -576,6 +588,13 @@ function openSession(host, id) {
   term.focus();
   const enc = new TextEncoder();
   term.onData((d) => send(v, enc.encode(d)));
+  term.attachCustomKeyEventHandler((ev) => {
+    const step = switchKey(ev);
+    if (!step) return true;
+    ev.preventDefault();
+    switchSession(v, step);
+    return false;
+  });
   term.onBinary((d) => send(v, Uint8Array.from(d, (c) => c.charCodeAt(0))));
   term.onResize(({ cols, rows }) => sendResize(v, cols, rows));
   v.onWindowResize = () => fit.fit();
@@ -730,6 +749,7 @@ function renderSessionChrome() {
   const connected = v.conn === 'connected';
   const connText = { connecting: 'Connecting…', connected: 'Connected', reconnecting: 'Reconnecting…', ended: 'Ended' }[v.conn];
   const viewers = session ? session.viewers : 0;
+  renderSessionsPanel(v);
   keepFocus(() => v.chromeEl.replaceChildren(
     h('div', { class: 'session-head' },
       tile(v.host, !!(host && host.online)),
@@ -741,6 +761,101 @@ function renderSessionChrome() {
       session ? h('span', { class: 'chip' }, `Started ${longAge(session.created)}`) : null,
       session && connected ? h('span', { class: 'chip' }, viewers <= 1 ? 'Only you are viewing' : `${viewers} people viewing`) : null,
       h('span', { class: connected ? 'chip ok' : 'chip' }, h('span', { class: connected ? 'dot ok' : 'dot' }), connText))));
+}
+
+// ---------- sessions panel ----------
+
+function initialPanelOpen() {
+  if (window.matchMedia(NARROW).matches) return false;
+  try { return localStorage.getItem(SIDEBAR_STORE) !== 'closed'; } catch (_) { return true; }
+}
+
+// panelGroups lists the live sessions per machine: hosts in overview order,
+// newest session first. An offline machine has no sessions.
+function panelGroups() {
+  const hosts = state.overview ? state.overview.hosts : [];
+  return hosts.map((host) => ({
+    host,
+    sessions: host.online
+      ? host.sessions.filter((s) => s.status !== 'exited' && s.status !== 'gone')
+        .sort((a, b) => Date.parse(b.created) - Date.parse(a.created))
+      : [],
+  }));
+}
+
+function panelFlat() {
+  return panelGroups().flatMap((g) => g.sessions.map((s) => ({ host: g.host.name, id: s.id })));
+}
+
+// neighbor is the session next to the open one in the panel, or null.
+function neighbor(v, step) {
+  const flat = panelFlat();
+  const i = flat.findIndex((x) => x.host === v.host && x.id === v.id);
+  if (flat.length === 0) return null;
+  const j = i < 0 ? (step > 0 ? 0 : flat.length - 1) : (i + step + flat.length) % flat.length;
+  const n = flat[j];
+  return n.host === v.host && n.id === v.id ? null : n;
+}
+
+function switchSession(v, step) {
+  const n = neighbor(v, step);
+  if (n) go(sessionHash(n.host, n.id));
+}
+
+// switchKey maps Alt+Up/Down and Alt+[ / Alt+] (by key code: on macOS Option+[
+// types another character) to -1 / +1. Nothing else is claimed.
+function switchKey(ev) {
+  if (ev.type !== 'keydown' || !ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) return 0;
+  if (ev.key === 'ArrowUp' || ev.code === 'BracketLeft') return -1;
+  if (ev.key === 'ArrowDown' || ev.code === 'BracketRight') return 1;
+  return 0;
+}
+
+function togglePanel(v) {
+  v.panelOpen = !v.panelOpen;
+  if (!window.matchMedia(NARROW).matches) {
+    try { localStorage.setItem(SIDEBAR_STORE, v.panelOpen ? 'open' : 'closed'); } catch (_) { /* storage blocked */ }
+  }
+  renderSessionsPanel(v);
+  v.fit.fit();
+  requestAnimationFrame(() => v.fit.fit());
+}
+
+function panelItem(v, hostName, s) {
+  const current = hostName === v.host && s.id === v.id;
+  return h('a', {
+    class: current ? 'panel-item current' : 'panel-item',
+    href: sessionHash(hostName, s.id),
+    'aria-current': current ? 'page' : null,
+    'data-key': `side:${hostName}/${s.id}`,
+  },
+  h('span', { class: 'row-title' }, sessionLabel(s)),
+  h('span', { class: 'small muted' }, `Started ${longAge(s.created)}`));
+}
+
+function renderSessionsPanel(v) {
+  const groups = panelGroups();
+  v.panelEl.classList.toggle('collapsed', !v.panelOpen);
+  const body = !state.overview ? [h('p', { class: 'small muted' }, 'Loading…')]
+    : groups.map(({ host, sessions }) => h('section', { class: 'panel-group' },
+      h('h2', { class: 'panel-host' }, tile(host.name, host.online), h('span', { class: 'grow' }, host.name),
+        host.online ? null : h('span', { class: 'small muted' }, 'offline')),
+      sessions.map((s) => panelItem(v, host.name, s))));
+  const canCreate = state.overview && state.overview.hosts.some((x) => x.online);
+  keepFocus(() => v.panelEl.replaceChildren(
+    h('div', { class: 'panel-head' },
+      h('button', {
+        class: 'btn ghost small icon-btn', type: 'button', 'data-key': 'panel-toggle',
+        'aria-expanded': String(v.panelOpen), 'aria-label': v.panelOpen ? 'Hide sessions' : 'Show sessions',
+        title: v.panelOpen ? 'Hide sessions' : 'Show sessions', onclick: () => togglePanel(v),
+      }, icon('panel')),
+      h('span', { class: 'panel-title' }, 'Sessions')),
+    h('div', { class: 'panel-body' },
+      canCreate ? h('button', {
+        class: 'btn primary small', type: 'button', 'data-key': 'panel-new',
+        onclick: () => { if (!newDialog) openNewDialog(v.host, (host, id) => go(sessionHash(host, id))); },
+      }, icon('plus'), 'New session') : null,
+      body)));
 }
 
 function confirmDialog(title, text, action) {
@@ -760,9 +875,10 @@ function confirmDialog(title, text, action) {
 async function endSession(v, label) {
   const ok = await confirmDialog(`End ${label} on ${v.host}?`, 'Claude will stop. This cannot be undone.', 'End session');
   if (!ok) { v.term.focus(); return; }
+  const next = neighbor(v, 1);
   try {
     await api('DELETE', sessionPath(v.host, v.id));
-    go('#/');
+    go(next ? sessionHash(next.host, next.id) : '#/');
   } catch (e) {
     toast(`Couldn't end ${label}: ${e.message}`);
   }
@@ -771,7 +887,7 @@ async function endSession(v, label) {
 // ---------- start ----------
 
 window.addEventListener('hashchange', onRoute);
-setInterval(() => { if (!state.view && !newDialog) render(); }, 30000); // keep ages fresh
+setInterval(() => { if (state.view) renderSessionChrome(); else if (!newDialog) render(); }, 30000); // keep ages fresh
 // Load the terminal font first: xterm measures character size when it opens.
 document.fonts.load('14px "JetBrains Mono"').finally(() => {
   if (!KEY) { state.live = 'signed-out'; render(); return; }
