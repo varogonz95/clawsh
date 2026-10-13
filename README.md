@@ -28,14 +28,7 @@ curl -fsSL https://varogonz95.github.io/clawsh/install.sh | sh   # Linux, macOS
 irm https://varogonz95.github.io/clawsh/install.ps1 | iex   # Windows PowerShell
 ```
 
-With Node 18+: `npm i -g clawsh`, or run it without installing: `npx clawsh ls`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source you need Go 1.22+.
-
-```sh
-go mod tidy          # first time only
-make build           # or: go build -o clawsh ./cmd/clawsh
-make dist            # cross-compile all platforms into dist/
-make docker-dist     # same, built inside Docker (needs buildx, no local Go)
-```
+With Node 18+: `npm i -g clawsh`, or run it without installing: `npx clawsh ls`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source, see [How to build locally](#how-to-build-locally).
 
 On **each machine that should host sessions**:
 
@@ -56,6 +49,27 @@ clawsh ls                                      # everything, everywhere
 clawsh attach desk/8158                        # id prefix is enough
                                             # Ctrl-] detaches, session keeps running
 clawsh kill desk/8158
+```
+
+## How to build locally
+
+Needs Go 1.22+ and `make`. No cgo, so no C toolchain is required.
+
+```sh
+git clone https://github.com/varogonz95/clawsh.git
+cd clawsh
+make build           # produces ./clawsh (or: go build -o clawsh ./cmd/clawsh)
+make test            # race-enabled tests
+make vet             # vet for linux, windows and darwin
+make dist            # cross-compile all platforms into dist/
+make docker-dist     # same, built inside Docker (needs buildx, no local Go)
+```
+
+Try it without installing: run an agent with any command standing in for `claude`, then point a `hosts.toml` at it (see [Setup](#setup)).
+
+```sh
+./clawsh agent --claude /bin/sh     # listens on :7420
+./clawsh token                      # token for hosts.toml (url http://localhost:7420)
 ```
 
 ## Security
