@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -54,5 +55,26 @@ func TestIndexNotFramable(t *testing.T) {
 	}
 	if got := resp.Header.Get("Content-Security-Policy"); got != "frame-ancestors 'none'" {
 		t.Errorf("Content-Security-Policy = %q, want frame-ancestors 'none'", got)
+	}
+}
+
+// The session view has a sessions panel; the script builds it and the stylesheet lays it out.
+func TestStaticSessionsPanel(t *testing.T) {
+	_, base := startServer(t, noHosts(t))
+	c := login(t, base)
+	read := func(path string) string {
+		resp, err := c.Get(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return string(b)
+	}
+	if js := read("/static/app.js"); !strings.Contains(js, "sessions-panel") || !strings.Contains(js, "clawsh.sidebar") {
+		t.Error("app.js does not build the sessions panel")
+	}
+	if css := read("/static/app.css"); !strings.Contains(css, ".sessions-panel") {
+		t.Error("app.css does not style .sessions-panel")
 	}
 }
