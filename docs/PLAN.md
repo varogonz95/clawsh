@@ -22,7 +22,7 @@ Goal: one terminal on any PC shows every Claude Code session on every LAN machin
 
 ## Later
 
-Split-pane multi-view; mDNS discovery; TLS or Tailscale for off-LAN; session persistence across agent restarts.
+Split-pane multi-view; mDNS discovery; TLS or Tailscale for off-LAN; session persistence across agent restarts; Claude Code cloud sessions once Anthropic publishes an API for them (#63, spike `docs/spikes/cloud-sessions.md`).
 
 ## Manual Windows check (M0 exit criteria)
 
