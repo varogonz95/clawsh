@@ -610,6 +610,8 @@ function attachScrollThumb(term, host) {
     hideTimer = setTimeout(() => { if (!dragging && !thumb.matches(':hover')) thumb.classList.remove('on'); }, 1000);
   };
   term.onScroll(poke);
+  // The viewport's own scroll event also covers wheel/touch scrolling, which term.onScroll misses.
+  host.querySelector('.xterm-viewport').addEventListener('scroll', poke, { passive: true });
   term.onResize(place);
   thumb.addEventListener('pointerenter', () => { clearTimeout(hideTimer); thumb.classList.add('on'); });
   thumb.addEventListener('pointerleave', () => { if (!dragging) poke(); });
