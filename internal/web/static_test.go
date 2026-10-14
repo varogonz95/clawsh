@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -54,5 +55,22 @@ func TestIndexNotFramable(t *testing.T) {
 	}
 	if got := resp.Header.Get("Content-Security-Policy"); got != "frame-ancestors 'none'" {
 		t.Errorf("Content-Security-Policy = %q, want frame-ancestors 'none'", got)
+	}
+}
+
+// The duplicate-session route and its helpers must ship in app.js.
+func TestAppHasDuplicate(t *testing.T) {
+	_, base := startServer(t, noHosts(t))
+	c := login(t, base)
+	resp, err := c.Get(base + "/static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	for _, want := range []string{"'dup'", "nextName", "joinArgs", "splitArgs"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("app.js lacks %s", want)
+		}
 	}
 }
