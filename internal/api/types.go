@@ -104,3 +104,23 @@ type Overview struct {
 	ConfigError string         `json:"config_error,omitempty"`
 	Hosts       []HostOverview `json:"hosts"`
 }
+
+// Message is a note posted for a session (PoC, spike #74). The agent queues it
+// until the target's `clawsh mcp` stub fetches it and pushes it into claude as
+// a channel notification. Content is untrusted input from another session.
+type Message struct {
+	ID      string            `json:"id"`
+	To      string            `json:"to"`             // session id on this agent (managed or external)
+	From    string            `json:"from,omitempty"` // free-form sender label, e.g. "A/3f9c"
+	Content string            `json:"content"`
+	Meta    map[string]string `json:"meta,omitempty"` // channel tag attributes; keys are identifiers
+	Time    time.Time         `json:"time"`
+}
+
+// SendRequest is the body of POST /v1/messages.
+type SendRequest struct {
+	To      string            `json:"to"`
+	From    string            `json:"from,omitempty"`
+	Content string            `json:"content"`
+	Meta    map[string]string `json:"meta,omitempty"`
+}

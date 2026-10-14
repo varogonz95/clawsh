@@ -169,6 +169,7 @@ func runMCP(args []string) error {
 	logFile := fs.String("log-file", mcp.DefaultLogPath(), "spawned agent's log")
 	noSpawn := fs.Bool("no-spawn", false, "don't start an agent when none answers")
 	noAnnounce := fs.Bool("no-announce", false, "don't list this session on the agent")
+	channel := fs.Bool("channel", false, "PoC: declare the claude/channel capability and push inbox messages into the session")
 	_ = fs.Parse(args)
 	log.SetOutput(os.Stderr)
 	log.SetPrefix("clawsh mcp: ")
@@ -184,14 +185,19 @@ func runMCP(args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	served := make(chan error, 1)
-	go func() { served <- mcp.Serve(os.Stdin, os.Stdout) }()
+	var msgs chan api.Message
+	if *channel {
+		msgs = make(chan api.Message, 16)
+	}
+	go func() { served <- mcp.ServeChannel(os.Stdin, os.Stdout, msgs) }()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		mcp.Run(ctx, mcp.Options{
 			Listen: *listen, Claude: *claude, TokenFile: *tokenFile, LogFile: *logFile,
 			Spawn: !*noSpawn, Announce: !*noAnnounce && !managed,
-			Dir: dir, Pid: os.Getppid(),
+			Dir: dir, Pid: os.Getppid(), ID: os.Getenv("CLAWSH_SESSION_ID"),
+			Messages: sendOnly(msgs),
 		})
 	}()
 	var err error
@@ -488,4 +494,13 @@ func age(t time.Time) string {
 	default:
 		return fmt.Sprintf("%dd", int(d.Hours()/24))
 	}
+}
+
+// sendOnly keeps a nil channel nil (a nil chan converted to a send-only chan
+// is still nil, but this spells out that Run treats nil as "no channel").
+func sendOnly(c chan api.Message) chan<- api.Message {
+	if c == nil {
+		return nil
+	}
+	return c
 }

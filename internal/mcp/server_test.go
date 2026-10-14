@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/varogonz95/clawsh/internal/agent"
+	"github.com/varogonz95/clawsh/internal/api"
 	"github.com/varogonz95/clawsh/internal/hub"
 )
 
@@ -120,5 +121,78 @@ func TestLocalURL(t *testing.T) {
 	}
 	if _, err := LocalURL("7420"); err == nil {
 		t.Error("want error for missing colon")
+	}
+}
+
+// The spike's claim: a message posted to the agent for session B reaches B's
+// MCP server and leaves it as a channel notification, with the capability
+// declared at initialize. A scripted client stands in for Claude Code.
+func TestChannelDeliversPostedMessage(t *testing.T) {
+	tokenFile := filepath.Join(t.TempDir(), "agent.token")
+	token, _, err := agent.LoadOrCreateToken(tokenFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(agent.NewServer(agent.NewManager(agent.Options{}), token).Handler())
+	defer srv.Close()
+	c := hub.NewClient(hub.Host{URL: srv.URL, Token: token})
+
+	// Session B: its stub announces id "bbbb" and serves MCP on a pipe pair.
+	msgs := make(chan api.Message, 4)
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	go func() { _ = ServeChannel(inR, outW, msgs); outW.Close() }()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go Run(ctx, Options{
+		Listen: strings.TrimPrefix(srv.URL, "http://"), TokenFile: tokenFile,
+		Announce: true, Dir: "/src/b", Pid: 7, ID: "bbbb", Messages: msgs,
+	})
+
+	lines := bufio.NewScanner(outR)
+	read := func() map[string]any {
+		t.Helper()
+		if !lines.Scan() {
+			t.Fatalf("stream ended: %v", lines.Err())
+		}
+		var m map[string]any
+		if err := json.Unmarshal(lines.Bytes(), &m); err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	io.WriteString(inW, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`+"\n")
+	caps := read()["result"].(map[string]any)["capabilities"].(map[string]any)
+	if _, ok := caps["experimental"].(map[string]any)["claude/channel"]; !ok {
+		t.Fatalf("capabilities = %v", caps)
+	}
+
+	// Unknown targets are refused; B is known once announced.
+	if _, err := c.Send(context.Background(), api.SendRequest{To: "nope", Content: "x"}); err == nil {
+		t.Fatal("send to unknown session should fail")
+	}
+	var posted api.Message
+	for deadline := time.Now().Add(3 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		posted, err = c.Send(context.Background(), api.SendRequest{
+			To: "bbbb", From: "A/1234", Content: "implement feature X",
+			Meta: map[string]string{"stage": "implement", "bad-key": "dropped", "from": "spoofed"},
+		})
+		if err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("send: %v", err)
+		}
+	}
+
+	n := read()
+	if n["method"] != "notifications/claude/channel" || n["id"] != nil {
+		t.Fatalf("notification = %v", n)
+	}
+	p := n["params"].(map[string]any)
+	meta := p["meta"].(map[string]any)
+	if p["content"] != "implement feature X" || meta["from"] != "A/1234" || meta["stage"] != "implement" ||
+		meta["message_id"] != posted.ID || meta["bad-key"] != nil {
+		t.Fatalf("params = %v", p)
 	}
 }

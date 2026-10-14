@@ -25,12 +25,13 @@ type Server struct {
 	token    string
 	hostname string
 	up       websocket.Upgrader
+	inbox    *inbox
 }
 
 func NewServer(m *Manager, token string) *Server {
 	host, _ := os.Hostname()
 	return &Server{
-		m: m, token: token, hostname: host,
+		m: m, token: token, hostname: host, inbox: newInbox(),
 		up: websocket.Upgrader{
 			ReadBufferSize:  32 * 1024,
 			WriteBufferSize: 32 * 1024,
@@ -51,6 +52,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /v1/external", s.auth(s.listExternal))
 	mux.Handle("PUT /v1/external/{id}", s.auth(s.announce))
 	mux.Handle("DELETE /v1/external/{id}", s.auth(s.withdraw))
+	mux.Handle("POST /v1/messages", s.auth(s.postMessage))
+	mux.Handle("GET /v1/inbox/{id}", s.auth(s.getInbox))
 	return mux
 }
 

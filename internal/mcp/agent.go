@@ -31,6 +31,11 @@ type Options struct {
 	Dir       string // session directory to announce
 	Pid       int    // claude's pid to announce
 	Renew     time.Duration
+	// ID is the session id to announce (random if empty) and whose inbox is
+	// polled; for a managed session it is $CLAWSH_SESSION_ID. Messages, when
+	// non-nil, receives what the inbox yields (PoC, spike #74).
+	ID       string
+	Messages chan<- api.Message
 }
 
 // LocalURL turns a listen address into a URL reachable from this machine.
@@ -74,12 +79,18 @@ func Run(ctx context.Context, o Options) {
 	if err := ensure(ctx, c, o); err != nil {
 		log.Printf("agent: %v", err)
 	}
+	id := o.ID
+	if id == "" {
+		id = newID()
+	}
+	if o.Messages != nil {
+		go pollInbox(ctx, c, id, o.Messages)
+	}
 	if !o.Announce {
 		<-ctx.Done()
 		return
 	}
 
-	id := newID()
 	req := api.AnnounceRequest{Dir: o.Dir, Pid: o.Pid}
 	announce := func() {
 		actx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -104,6 +115,27 @@ func Run(ctx context.Context, o Options) {
 			_ = c.Withdraw(wctx, id)
 			cancel()
 			return
+		}
+	}
+}
+
+// pollInbox long-polls the agent's inbox for id and forwards what it gets.
+func pollInbox(ctx context.Context, c *hub.Client, id string, out chan<- api.Message) {
+	for ctx.Err() == nil {
+		msgs, err := c.Inbox(ctx, id, 8*time.Second) // under the client's 10s timeout
+		if err != nil {
+			select {
+			case <-ctx.Done():
+			case <-time.After(2 * time.Second):
+			}
+			continue
+		}
+		for _, m := range msgs {
+			select {
+			case out <- m:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}
 }

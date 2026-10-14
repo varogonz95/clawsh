@@ -133,3 +133,15 @@ func decodeErr(resp *http.Response) error {
 	}
 	return he
 }
+
+// Send posts a message for a session on this host (PoC, spike #74).
+func (c *Client) Send(ctx context.Context, req api.SendRequest) (api.Message, error) {
+	var out api.Message
+	return out, c.do(ctx, http.MethodPost, "/v1/messages", req, &out)
+}
+
+// Inbox long-polls the queue of a session for up to wait.
+func (c *Client) Inbox(ctx context.Context, id string, wait time.Duration) ([]api.Message, error) {
+	var out []api.Message
+	return out, c.do(ctx, http.MethodGet, "/v1/inbox/"+url.PathEscape(id)+"?wait="+wait.String(), nil, &out)
+}

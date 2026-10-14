@@ -199,3 +199,20 @@ func newID() string {
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+// Knows reports whether id is a managed session (exact id) or a live external
+// one. Messages are only accepted for sessions the agent knows about.
+func (m *Manager) Knows(id string) bool {
+	m.mu.RLock()
+	_, ok := m.sessions[id]
+	m.mu.RUnlock()
+	if ok {
+		return true
+	}
+	for _, x := range m.Externals() {
+		if x.ID == id {
+			return true
+		}
+	}
+	return false
+}
