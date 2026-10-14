@@ -131,6 +131,37 @@ permission_mode = "default"
 role = "Summarise the run branch diff as release notes. Do not push."
 ```
 
+Sequence for the SW-lifecycle example (GitHub renders the Mermaid block):
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant F as clawsh flow (hub)
+    participant A as planner (host A)
+    participant B as implementer (host B)
+    participant C as test-writer / verifier (host C)
+    U->>F: flow run sdlc.toml "design"
+    F->>A: create session, send design (inbox, channel)
+    A-->>F: handoff(plan, branch@sha)
+    F->>U: gate: approve plan?
+    U->>F: flow approve
+    par in parallel
+        F->>B: create session, send plan + branch
+    and
+        F->>C: create session, send plan (write tests)
+    end
+    B-->>F: handoff(commit sha)
+    C-->>F: handoff(tests pushed)
+    F->>C: start verifier on run branch
+    alt tests red (max 3 iterations)
+        C-->>F: handoff(failed: failing tests)
+        F->>B: send failures, back to implementer
+    else green
+        C-->>F: handoff(green)
+        F->>U: done, release-notes gate
+    end
+```
+
 ## 5. Handing off artifacts between machines
 
 | Mechanism | Use |
