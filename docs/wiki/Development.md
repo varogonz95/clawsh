@@ -24,7 +24,9 @@ For a manual loop, run `./clawsh agent --claude /bin/sh` and point a `hosts.toml
 
 `clawsh version` prints the version baked in at build time. The Makefile takes it from the latest `v*` tag (`v0.1.0` → `0.1.0`, later commits `0.1.0-3-gabc1234`); before the first tag it's `dev+<commit>`. Override with `make dist VERSION=1.2.3`. A plain `go build` from a checkout reports `dev+<commit>` too (Go records the commit in the binary), and `dev` when there's no git information. `clawsh hosts` shows release versions with a `v` prefix and dev builds as they are.
 
-To publish, bump `plugin/.claude-plugin/plugin.json` to the new version (the release fails if it doesn't match the tag), then push a tag:
+To publish, run the `release-prepare` workflow (Actions tab, or `gh workflow run release-prepare.yml -f version=0.2.0`). It takes the version (`0.2.0`, or `0.2.0-rc.1` for a pre-release) and optionally a commit on `main` to release (default: the tip). It bumps `plugin/.claude-plugin/plugin.json` on top of that commit, tags it `v<version>`, pushes the tag and puts the bump on `main`. It needs a repository secret `RELEASE_TOKEN` (a fine-grained token with Contents: read and write), because tags pushed with the default `GITHUB_TOKEN` don't start other workflows.
+
+To do the same by hand, bump `plugin/.claude-plugin/plugin.json` to the new version (the release fails if it doesn't match the tag), then push a tag:
 
 ```sh
 git tag v0.1.0 && git push origin v0.1.0
