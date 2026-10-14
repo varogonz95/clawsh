@@ -22,6 +22,7 @@ To keep the access key off the command line, the browser is opened through a sho
 
 - **Your machines:** a card per host with its sessions. Offline machines show why. The page updates by itself.
 - **A session:** the terminal fills the page. Leaving it only disconnects you; Claude keeps working.
+- **Copying:** when Claude copies text (the "copied N chars" hint), it lands on your browser clipboard. If the browser blocks the write, it completes on your next click or key press in the terminal.
 - **New session:** pick a machine, a folder and optionally a name and extra Claude arguments.
 - **Machines page** (`Machines` in the top bar): add, edit, test and remove machines without editing `hosts.toml`. The access key field is write-only: saved keys are never sent back to the browser, and leaving it empty on edit keeps the saved key. *Test connection* checks the address and key (reports reachable, unreachable or key rejected) before or after saving. Saving rewrites `hosts.toml` (written atomically, mode `0600`); comments in a hand-edited file are dropped, and the previous version is kept as `hosts.toml.bak`. If `hosts.toml` doesn't parse, the page refuses to save until you fix it by hand.
 - **No machines yet:** the steps to add one, or a link to the Machines page. The page notices when you save `hosts.toml`.
