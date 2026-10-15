@@ -5,5 +5,31 @@
     "pr": "",
     "sessionUrl": false
   },
-  "includeGitInstructions": false
+  "includeGitInstructions": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/github-attribution.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/github-attribution.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }
