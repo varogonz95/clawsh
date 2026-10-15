@@ -1,0 +1,151 @@
+name: release-prepare
+
+# Cuts a release of main from the Actions tab or the CLI:
+#   gh workflow run release-prepare.yml -f version=0.2.0 [-f ref=<sha on main>]
+# It bumps plugin/.claude-plugin/plugin.json on top of the chosen commit, merges
+# that into main and pushes main and the tag together, which starts release.yml.
+# To patch an older release, use release-hotfix.yml.
+#
+# Needs a repository secret RELEASE_TOKEN: a token that can push to main (a
+# fine-grained PAT with Contents: read and write, allowed past any branch
+# protection on main, plus Workflows: read and write, which GitHub requires to
+# push commits that change .github/workflows/). Tags pushed with the default GITHUB_TOKEN don't trigger
+# other workflows, so release.yml would never run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v: 0.2.0, or 0.2.0-rc.1 for a pre-release"
+        required: true
+        type: string
+      ref:
+        description: "Commit on main to release (SHA). Empty: the tip of main"
+        required: false
+        type: string
+      allow_non_product:
+        description: "Release even if nothing since the last release touches a path in .github/product-paths"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# Shared with release-hotfix.yml: one release runs at a time and at most one
+# waits; a newer dispatch cancels the waiting one, so dispatch the next release
+# after the previous run finishes.
+concurrency:
+  group: release-dispatch
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      REF: ${{ inputs.ref }}
+      ALLOW_NON_PRODUCT: ${{ inputs.allow_non_product }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check token
+        run: |
+          if [[ -z $RELEASE_TOKEN ]]; then
+            echo "::error::Secret RELEASE_TOKEN is not set (see the header of release-prepare.yml)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Resolve commit
+        run: |
+          set -euo pipefail
+          cp scripts/release/lib.sh "$RUNNER_TEMP/lib.sh"
+          source "$RUNNER_TEMP/lib.sh"
+
+          if [[ ! $VERSION =~ $SEMVER_RE ]]; then
+            echo "::error::'$VERSION' is not a semantic version like 1.2.3 or 1.2.3-rc.1 (no leading v)"
+            exit 1
+          fi
+          tag="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::Tag $tag already exists"
+            exit 1
+          fi
+          highest=$(highest_stable)
+          if [[ -n $highest ]] && ! version_gt "$VERSION" "$highest"; then
+            echo "::error::$VERSION is not newer than the latest release v$highest. To patch an older line, use release-hotfix.yml"
+            exit 1
+          fi
+
+          sha=$(git rev-parse --verify "${REF:-origin/main}^{commit}")
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$sha is not on main"
+            exit 1
+          fi
+
+          # The last stable release in main's history. Releases are merged into main
+          # below, so their tags stay reachable from it.
+          prev=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude 'v*-*' origin/main 2>/dev/null || true)
+          if [[ -n $prev ]]; then
+            if [[ $(git rev-parse "$prev^{commit}") == "$sha" ]] || ! git merge-base --is-ancestor "$prev" "$sha"; then
+              echo "::error::${sha:0:7} is not newer than the last release $prev. Pick a later commit, or use release-hotfix.yml"
+              exit 1
+            fi
+            # Docs, site and workflow changes don't need a release: require a product
+            # change. plugin.json is left out because release bumps alone change it.
+            if [[ $ALLOW_NON_PRODUCT != true ]]; then
+              mapfile -t paths < <(grep -v '^#' .github/product-paths | grep .)
+              if [[ -z $(git diff --name-only "$prev" "$sha" -- "${paths[@]}" ':(exclude)plugin/.claude-plugin/plugin.json') ]]; then
+                echo "::error::No product change between $prev and ${sha:0:7} (paths in .github/product-paths). Tick allow_non_product to release anyway."
+                exit 1
+              fi
+            fi
+          fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "SHA=$sha" >> "$GITHUB_ENV"
+
+      - name: Bump, tag and push
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/lib.sh"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --detach "$SHA"
+
+          bump_plugin "$VERSION"
+          if git diff --quiet; then
+            echo "::notice::plugin.json is already at $VERSION; tagging ${SHA:0:7} as it is"
+            release=$SHA
+          else
+            git commit -qam "release: $TAG"
+            release=$(git rev-parse HEAD)
+          fi
+          git tag -a "$TAG" -m "clawsh $TAG" "$release"
+
+          # Bring the release commit into main so the tag stays in main's history
+          # (a fast-forward when SHA is main's tip, a merge otherwise).
+          git checkout -q -B main origin/main
+          if ! git merge -q --no-edit -m "Merge $TAG into main" "$release"; then
+            git merge --abort || true
+            echo "::error::Merging $TAG into main conflicts (was plugin.json edited on main after ${SHA:0:7}?). Nothing was pushed."
+            exit 1
+          fi
+
+          # Atomic: main and the tag land together or not at all, so nothing is
+          # published unless main has the bump.
+          if ! git push --atomic origin main "refs/tags/$TAG"; then
+            echo "::error::Push rejected: main moved during the run, or RELEASE_TOKEN can't push to main. Nothing was pushed; re-run."
+            exit 1
+          fi
+
+          {
+            echo "### Tagged $TAG"
+            echo "Commit \`${release:0:7}\` (based on \`${SHA:0:7}\`), merged into main. [release.yml](../../actions/workflows/release.yml) is publishing it."
+          } >> "$GITHUB_STEP_SUMMARY"
