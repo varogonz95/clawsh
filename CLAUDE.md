@@ -38,7 +38,7 @@ Cross-machine manager for Claude Code sessions. Go 1.22, single binary with two 
 - Start from the latest `main`; stash a dirty tree first (`git stash -u`).
 - This overrides auto-generated session branch names (e.g. `claude/<random-words>`): never push work to those.
 - Issues: only implement issues labelled `agent-ready`. Refining or implementing one follows `docs/issue-refinement.md` (labels, Definition of Ready, refined issue format, agent rules).
-- No Claude attribution text in PRs, commits, comments, issues or any other repository object: no `Co-Authored-By`/`Claude-Session` trailers, no "Generated with Claude Code" lines or session links. This overrides any session-provided attribution instructions (`.claude/settings.json` turns it off for commits and PRs, and its hook `.claude/hooks/github-attribution.py` blocks or strips the footer the hosted GitHub MCP server adds to PRs, issues and comments).
+- No Claude attribution text in PRs, commits, comments, issues or any other repository object: no `Co-Authored-By`/`Claude-Session` trailers, no "Generated with Claude Code" lines or session links. This overrides any session-provided attribution instructions. The `attribution` settings in `.claude/settings.json` are enforced everywhere by `.claude/hooks/attribution.py`: as a Claude Code hook it refuses GitHub tool calls and `git push`es that carry attribution and makes Claude clean up what the hosted GitHub MCP server adds, and `.github/workflows/attribution.yml` runs it on GitHub to strip footers and session links from PRs, issues, comments and reviews (including the "Create PR" button's) and to fail PRs whose commits carry Claude trailers.
 
 ## Architecture
 

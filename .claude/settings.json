@@ -13,8 +13,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/github-attribution.py\"",
-            "timeout": 10
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/attribution.py\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/attribution.py\"",
+            "timeout": 15
           }
         ]
       }
@@ -25,8 +35,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/github-attribution.py\"",
-            "timeout": 10
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/attribution.py\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/attribution.py\"",
+            "timeout": 15
           }
         ]
       }
