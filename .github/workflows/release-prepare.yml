@@ -22,6 +22,11 @@ on:
         description: "Commit on main to release (SHA). Empty: the tip of main"
         required: false
         type: string
+      allow_non_product:
+        description: "Release even if nothing since the last tag touches a path in .github/product-paths"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -35,6 +40,7 @@ jobs:
     env:
       VERSION: ${{ inputs.version }}
       REF: ${{ inputs.ref }}
+      ALLOW_NON_PRODUCT: ${{ inputs.allow_non_product }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
     steps:
       - name: Check inputs
@@ -66,6 +72,15 @@ jobs:
           if ! git merge-base --is-ancestor "$sha" origin/main; then
             echo "::error::$sha is not on main"
             exit 1
+          fi
+          # Docs, site and workflow changes don't need a release: require a product change.
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "$sha" 2>/dev/null || true)
+          if [[ -n $prev && $ALLOW_NON_PRODUCT != true ]]; then
+            mapfile -t paths < <(grep -v '^#' .github/product-paths | grep .)
+            if [[ -z $(git diff --name-only "$prev" "$sha" -- "${paths[@]}") ]]; then
+              echo "::error::No product change between $prev and ${sha:0:7} (paths in .github/product-paths). Tick allow_non_product to release anyway."
+              exit 1
+            fi
           fi
           echo "TAG=$tag" >> "$GITHUB_ENV"
           echo "SHA=$sha" >> "$GITHUB_ENV"
