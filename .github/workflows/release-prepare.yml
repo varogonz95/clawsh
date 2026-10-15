@@ -8,7 +8,8 @@ name: release-prepare
 #
 # Needs a repository secret RELEASE_TOKEN: a token that can push to main (a
 # fine-grained PAT with Contents: read and write, allowed past any branch
-# protection on main). Tags pushed with the default GITHUB_TOKEN don't trigger
+# protection on main, plus Workflows: read and write, which GitHub requires to
+# push commits that change .github/workflows/). Tags pushed with the default GITHUB_TOKEN don't trigger
 # other workflows, so release.yml would never run.
 
 on:
@@ -31,7 +32,9 @@ on:
 permissions:
   contents: read
 
-# Shared with release-hotfix.yml: two releases never compute tags at the same time.
+# Shared with release-hotfix.yml: one release runs at a time and at most one
+# waits; a newer dispatch cancels the waiting one, so dispatch the next release
+# after the previous run finishes.
 concurrency:
   group: release-dispatch
 

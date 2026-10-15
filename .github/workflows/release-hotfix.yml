@@ -13,7 +13,8 @@ name: release-hotfix
 # would move it backwards.
 #
 # Needs the same RELEASE_TOKEN secret as release-prepare.yml, and the token must
-# be allowed to push release/* branches.
+# be allowed to push release/* branches. Picking a commit that changes
+# .github/workflows/ also needs the token's Workflows: read and write permission.
 
 on:
   workflow_dispatch:
@@ -30,7 +31,9 @@ on:
 permissions:
   contents: read
 
-# Shared with release-prepare.yml: two releases never compute tags at the same time.
+# Shared with release-prepare.yml: one release runs at a time and at most one
+# waits; a newer dispatch cancels the waiting one, so dispatch the next release
+# after the previous run finishes.
 concurrency:
   group: release-dispatch
 
@@ -98,12 +101,21 @@ jobs:
             if (( $(git rev-list --parents -n1 "$sha" | wc -w) > 2 )); then
               echo "::error::$c is a merge commit; pass the commits it merged instead"; exit 1
             fi
+            if [[ -n $(git diff-tree --no-commit-id --name-only -r "$sha" -- .github/workflows/) ]]; then
+              echo "::notice::${sha:0:7} changes .github/workflows/; pushing it needs RELEASE_TOKEN's Workflows: read and write permission"
+            fi
             shas+=("$sha")
           done
 
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             git fetch -q origin "$branch"
             git checkout -q -B "$branch" "origin/$branch"
+            # A later release of this line cut from main (release-prepare) isn't on
+            # the branch; tagging the branch would drop what that release shipped.
+            if ! git merge-base --is-ancestor "v$newest" HEAD; then
+              echo "::error::$branch does not contain v$newest, the latest $line.x release, so this hotfix would drop changes that already shipped. Merge v$newest into $branch by hand, then re-run."
+              exit 1
+            fi
           else
             echo "Creating $branch from v$newest"
             git checkout -q -B "$branch" "v$newest"
@@ -130,6 +142,14 @@ jobs:
           done
           if [[ $(git rev-parse HEAD) == "$start" ]]; then
             echo "::error::Every commit is already on $branch; nothing to release"
+            exit 1
+          fi
+
+          # The tag runs release.yml as it is on this commit. Without the Channel step
+          # it would publish to GitHub's Latest and npm's latest.
+          if ! grep -q 'id: channel' .github/workflows/release.yml; then
+            fix=$(git log -1 --format=%h -S'id: channel' origin/main -- .github/workflows/release.yml)
+            echo "::error::release.yml on $branch predates the Latest/npm dist-tag handling, so this hotfix would become the latest release. Add the commit on main that changed release.yml (${fix:-see git log -- .github/workflows/release.yml}) to commits; RELEASE_TOKEN then needs Workflows: read and write."
             exit 1
           fi
 
