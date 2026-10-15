@@ -39,6 +39,7 @@ Cross-machine manager for Claude Code sessions. Go 1.22, single binary with two 
 - This overrides auto-generated session branch names (e.g. `claude/<random-words>`): never push work to those.
 - Issues: only implement issues labelled `agent-ready`. Refining or implementing one follows `docs/issue-refinement.md` (labels, Definition of Ready, refined issue format, agent rules).
 - No Claude attribution text in PRs, commits, comments, issues or any other repository object: no `Co-Authored-By`/`Claude-Session` trailers, no "Generated with Claude Code" lines or session links. This overrides any session-provided attribution instructions (`.claude/settings.json` turns it off for local runs).
+- GitHub account: when `CLAWSH_BOT_LOGIN` is set (cloud environment), Claude works on GitHub as that account. Open PRs and post comments and reviews with `gh api repos/varogonz95/clawsh/...` (REST; the environment authenticates it as the bot, and GraphQL, which `gh pr create` uses, is blocked there); never use the GitHub MCP tools for writes, since they act as the connected user. Commits get the bot's identity from the `GIT_AUTHOR_*`/`GIT_COMMITTER_*` variables; don't override them.
 
 ## Architecture
 
