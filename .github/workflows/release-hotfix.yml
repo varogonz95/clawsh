@@ -1,11 +1,16 @@
 name: release-hotfix
 
-# Ships chosen commits from main as a patch on top of an older release:
+# Ships chosen commits from main as a patch on top of an earlier release:
 #   gh workflow run release-hotfix.yml -f version=0.1.1 -f commits="<sha> <sha>"
-# It checks out release/<major>.<minor> (created from the latest v<major>.<minor>.*
+# It checks out release/<major>.<minor> (created from the newest v<major>.<minor>.*
 # tag the first time), cherry-picks the commits with -x, bumps
 # plugin/.claude-plugin/plugin.json, tags the result and pushes the branch and
-# tag, which starts release.yml. To release main as it is, use release-prepare.yml.
+# tag together, which starts release.yml. To release main as it is, use
+# release-prepare.yml.
+#
+# The bump stays on the release branch. main's plugin.json is set by
+# release-prepare at each release, and copying an older line's version into it
+# would move it backwards.
 #
 # Needs the same RELEASE_TOKEN secret as release-prepare.yml, and the token must
 # be allowed to push release/* branches.
@@ -25,8 +30,9 @@ on:
 permissions:
   contents: read
 
+# Shared with release-prepare.yml: two releases never compute tags at the same time.
 concurrency:
-  group: release-hotfix
+  group: release-dispatch
 
 jobs:
   hotfix:
@@ -35,16 +41,14 @@ jobs:
       VERSION: ${{ inputs.version }}
       COMMITS: ${{ inputs.commits }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Check inputs
         run: |
           if [[ -z $RELEASE_TOKEN ]]; then
             echo "::error::Secret RELEASE_TOKEN is not set (see the header of release-hotfix.yml)"
-            exit 1
-          fi
-          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
-          if [[ ! $VERSION =~ $semver ]]; then
-            echo "::error::'$VERSION' is not a semantic version like 1.2.3 or 1.2.3-rc.1 (no leading v)"
             exit 1
           fi
           if [[ ! $COMMITS =~ ^[0-9a-f]{7,40}( [0-9a-f]{7,40})*$ ]]; then
@@ -60,12 +64,28 @@ jobs:
 
       - name: Cherry-pick, bump, tag and push
         run: |
-          tag="v$VERSION"
-          line=$(echo "$VERSION" | cut -d. -f1,2)
-          branch="release/$line"
+          set -euo pipefail
+          cp scripts/release/lib.sh "$RUNNER_TEMP/lib.sh"
+          source "$RUNNER_TEMP/lib.sh"
 
+          if [[ ! $VERSION =~ $SEMVER_RE ]]; then
+            echo "::error::'$VERSION' is not a semantic version like 1.2.3 or 1.2.3-rc.1 (no leading v)"
+            exit 1
+          fi
+          tag="v$VERSION"
+          line=$(core "$VERSION" | cut -d. -f1,2)
+          branch="release/$line"
           if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
             echo "::error::Tag $tag already exists"; exit 1
+          fi
+          newest=$(highest_stable "v$line.*")
+          if [[ -z $newest ]]; then
+            echo "::error::No v$line.* release to patch; for a new minor line use release-prepare.yml"
+            exit 1
+          fi
+          if ! version_gt "$VERSION" "$newest"; then
+            echo "::error::$VERSION is not newer than v$newest, the latest $line.x release"
+            exit 1
           fi
 
           # Resolve and check every commit before touching anything.
@@ -75,6 +95,9 @@ jobs:
             if ! git merge-base --is-ancestor "$sha" origin/main; then
               echo "::error::$c is not on main"; exit 1
             fi
+            if (( $(git rev-list --parents -n1 "$sha" | wc -w) > 2 )); then
+              echo "::error::$c is a merge commit; pass the commits it merged instead"; exit 1
+            fi
             shas+=("$sha")
           done
 
@@ -82,37 +105,45 @@ jobs:
             git fetch -q origin "$branch"
             git checkout -q -B "$branch" "origin/$branch"
           else
-            base=$(git tag -l "v$line.*" | grep -v -- - | sort -V | tail -1)
-            if [[ -z $base ]]; then
-              echo "::error::No v$line.* release tag to branch from; for a new minor line use release-prepare.yml"
-              exit 1
-            fi
-            echo "Creating $branch from $base"
-            git checkout -q -B "$branch" "$base"
+            echo "Creating $branch from v$newest"
+            git checkout -q -B "$branch" "v$newest"
           fi
+          start=$(git rev-parse HEAD)
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           for sha in "${shas[@]}"; do
-            if ! git cherry-pick -x "$sha" >/dev/null; then
-              git cherry-pick --abort 2>/dev/null || true
-              echo "::error::Cherry-picking ${sha:0:7} onto $branch failed (conflict or empty). Pick it by hand on the branch, or add the commits it depends on first."
-              exit 1
+            if git cherry-pick -x "$sha" >/dev/null 2>&1; then
+              continue
             fi
+            conflicts=$(git diff --name-only --diff-filter=U)
+            if [[ -z $conflicts ]] && git diff --cached --quiet; then
+              # Nothing left to apply: the change is already on the branch.
+              git cherry-pick --skip
+              echo "::notice::${sha:0:7} is already on $branch; skipped"
+              continue
+            fi
+            git cherry-pick --abort
+            echo "::error::Cherry-picking ${sha:0:7} onto $branch conflicts in: $(echo $conflicts). Pick it by hand on the branch, or add the commits it depends on first."
+            exit 1
           done
-
-          # sed keeps the file's hand-formatted layout; VERSION is validated above.
-          sed -i -E "s/(\"version\": \")[^\"]*(\")/\1${VERSION}\2/" plugin/.claude-plugin/plugin.json
-          jq -e --arg v "$VERSION" '.version == $v' plugin/.claude-plugin/plugin.json >/dev/null
-          if ! git diff --quiet; then
-            git commit -qam "release: $tag"
+          if [[ $(git rev-parse HEAD) == "$start" ]]; then
+            echo "::error::Every commit is already on $branch; nothing to release"
+            exit 1
           fi
+
+          bump_plugin "$VERSION"
+          if git diff --quiet; then
+            echo "::error::plugin.json on $branch is already at $VERSION"
+            exit 1
+          fi
+          git commit -qam "release: $tag"
           git tag -a "$tag" -m "clawsh $tag"
           git push --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$tag"
 
           {
             echo "### Tagged $tag on $branch"
-            echo "Picked: ${shas[*]:0:20}"
-            echo "release.yml is publishing it."
+            echo "Picked: ${shas[*]}"
+            echo "[release.yml](../../actions/workflows/release.yml) is publishing it."
           } >> "$GITHUB_STEP_SUMMARY"
