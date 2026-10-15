@@ -19,7 +19,7 @@ import sys
 # Matches real footers, trailers and session links, not prose that mentions them
 # (a footer line, a session URL with its id, a trailer at the start of a line).
 ATTRIBUTION = re.compile(
-    r"^\W*Generated (by|with) \[?Claude Code"
+    r"^[\W_]*Generated (by|with) \[?Claude Code"
     r"|claude\.ai/code/session_[A-Za-z0-9]{6,}"
     r"|^\s*(Co-Authored-By:\s*Claude|Claude-Session:)",
     re.IGNORECASE | re.MULTILINE,
