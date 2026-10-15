@@ -26,6 +26,8 @@ For a manual loop, run `./clawsh agent --claude /bin/sh` and point a `hosts.toml
 
 To publish, run the `release-prepare` workflow (Actions tab, or `gh workflow run release-prepare.yml -f version=0.2.0`). It takes the version (`0.2.0`, or `0.2.0-rc.1` for a pre-release) and optionally a commit on `main` to release (default: the tip). It bumps `plugin/.claude-plugin/plugin.json` on top of that commit, tags it `v<version>`, pushes the tag and puts the bump on `main`. It needs a repository secret `RELEASE_TOKEN` (a fine-grained token with Contents: read and write), because tags pushed with the default `GITHUB_TOKEN` don't start other workflows.
 
+To ship only chosen commits as a patch on an older release, run `release-hotfix` (`gh workflow run release-hotfix.yml -f version=0.1.1 -f commits="<sha> <sha>"`). It checks out `release/<major>.<minor>` (created from the newest `v<major>.<minor>.*` tag the first time), cherry-picks the commits from `main` with `-x`, bumps `plugin.json`, then pushes the branch and the tag. A conflicting pick stops the run with the commit named; resolve it by hand on the branch. A hotfix on an older line is not marked "Latest" on GitHub and goes to the npm dist-tag `release-<major>.<minor>` instead of `latest`. For new features use `release-prepare` instead; cherry-picking features pulls in untested combinations.
+
 To do the same by hand, bump `plugin/.claude-plugin/plugin.json` to the new version (the release fails if it doesn't match the tag), then push a tag:
 
 ```sh

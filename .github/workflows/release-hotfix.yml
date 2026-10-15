@@ -1,0 +1,118 @@
+name: release-hotfix
+
+# Ships chosen commits from main as a patch on top of an older release:
+#   gh workflow run release-hotfix.yml -f version=0.1.1 -f commits="<sha> <sha>"
+# It checks out release/<major>.<minor> (created from the latest v<major>.<minor>.*
+# tag the first time), cherry-picks the commits with -x, bumps
+# plugin/.claude-plugin/plugin.json, tags the result and pushes the branch and
+# tag, which starts release.yml. To release main as it is, use release-prepare.yml.
+#
+# Needs the same RELEASE_TOKEN secret as release-prepare.yml, and the token must
+# be allowed to push release/* branches.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v: 0.1.1, or 0.1.1-rc.1 for a pre-release"
+        required: true
+        type: string
+      commits:
+        description: "Commits on main to cherry-pick, oldest first, separated by spaces"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-hotfix
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      COMMITS: ${{ inputs.commits }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    steps:
+      - name: Check inputs
+        run: |
+          if [[ -z $RELEASE_TOKEN ]]; then
+            echo "::error::Secret RELEASE_TOKEN is not set (see the header of release-hotfix.yml)"
+            exit 1
+          fi
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! $VERSION =~ $semver ]]; then
+            echo "::error::'$VERSION' is not a semantic version like 1.2.3 or 1.2.3-rc.1 (no leading v)"
+            exit 1
+          fi
+          if [[ ! $COMMITS =~ ^[0-9a-f]{7,40}( [0-9a-f]{7,40})*$ ]]; then
+            echo "::error::commits must be hex SHAs separated by single spaces"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Cherry-pick, bump, tag and push
+        run: |
+          tag="v$VERSION"
+          line=$(echo "$VERSION" | cut -d. -f1,2)
+          branch="release/$line"
+
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::Tag $tag already exists"; exit 1
+          fi
+
+          # Resolve and check every commit before touching anything.
+          shas=()
+          for c in $COMMITS; do
+            sha=$(git rev-parse --verify "$c^{commit}")
+            if ! git merge-base --is-ancestor "$sha" origin/main; then
+              echo "::error::$c is not on main"; exit 1
+            fi
+            shas+=("$sha")
+          done
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git fetch -q origin "$branch"
+            git checkout -q -B "$branch" "origin/$branch"
+          else
+            base=$(git tag -l "v$line.*" | grep -v -- - | sort -V | tail -1)
+            if [[ -z $base ]]; then
+              echo "::error::No v$line.* release tag to branch from; for a new minor line use release-prepare.yml"
+              exit 1
+            fi
+            echo "Creating $branch from $base"
+            git checkout -q -B "$branch" "$base"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for sha in "${shas[@]}"; do
+            if ! git cherry-pick -x "$sha" >/dev/null; then
+              git cherry-pick --abort 2>/dev/null || true
+              echo "::error::Cherry-picking ${sha:0:7} onto $branch failed (conflict or empty). Pick it by hand on the branch, or add the commits it depends on first."
+              exit 1
+            fi
+          done
+
+          # sed keeps the file's hand-formatted layout; VERSION is validated above.
+          sed -i -E "s/(\"version\": \")[^\"]*(\")/\1${VERSION}\2/" plugin/.claude-plugin/plugin.json
+          jq -e --arg v "$VERSION" '.version == $v' plugin/.claude-plugin/plugin.json >/dev/null
+          if ! git diff --quiet; then
+            git commit -qam "release: $tag"
+          fi
+          git tag -a "$tag" -m "clawsh $tag"
+          git push --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$tag"
+
+          {
+            echo "### Tagged $tag on $branch"
+            echo "Picked: ${shas[*]:0:20}"
+            echo "release.yml is publishing it."
+          } >> "$GITHUB_STEP_SUMMARY"

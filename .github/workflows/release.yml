@@ -84,6 +84,9 @@ jobs:
           fi
           flags=()
           [[ $GITHUB_REF_NAME == *-* ]] && flags+=(--prerelease)
+          # A hotfix on an older line (release/0.1 after 0.2.0) must not become "Latest".
+          highest=$(git ls-remote --tags --refs origin 'v*' | sed 's|.*refs/tags/v||' | grep -v -- - | sort -V | tail -1)
+          [[ $(printf '%s\n%s\n' "${GITHUB_REF_NAME#v}" "$highest" | sort -V | tail -1) != "${GITHUB_REF_NAME#v}" ]] && flags+=(--latest=false)
           gh release create "$GITHUB_REF_NAME" out/* \
             --verify-tag --generate-notes --title "clawsh ${GITHUB_REF_NAME}" "${flags[@]}"
 
@@ -115,6 +118,11 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           tag=latest; [[ $version == *-* ]] && tag=next
+          # A hotfix on an older line gets its own dist-tag so "latest" stays on the newest release.
+          highest=$(git ls-remote --tags --refs origin 'v*' | sed 's|.*refs/tags/v||' | grep -v -- - | sort -V | tail -1)
+          if [[ $tag == latest && $(printf '%s\n%s\n' "$version" "$highest" | sort -V | tail -1) != "$version" ]]; then
+            tag="release-$(echo "$version" | cut -d. -f1,2)"
+          fi
           for dir in out/npm/clawsh-*/ out/npm/clawsh/; do
             name=$(jq -r .name "$dir/package.json")
             if npm view "$name@$version" version >/dev/null 2>&1; then
