@@ -38,6 +38,10 @@ A template lives at `hosts.example.toml` in the repo.
 
 A 64-character hex token, generated on the agent's first run and written with mode `0600`. Delete it and restart the agent to rotate; then update `hosts.toml` everywhere. Use `--token-file` to keep it elsewhere.
 
+## `recent-dirs.json` (agent)
+
+A JSON array of the last 20 folders the agent started sessions in, most recent first, written with mode `0600` next to `agent.token`. The web UI shows it as recent folders in the new session dialog. Delete the file to clear it. Folders that no longer exist are hidden but stay in the file. Sessions announced through `/v1/external` are not recorded.
+
 ## Session environment
 
 Every session is started with the agent's environment plus:
