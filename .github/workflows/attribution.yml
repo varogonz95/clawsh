@@ -1,0 +1,36 @@
+name: attribution
+
+# Enforces the attribution settings in .claude/settings.json on GitHub, for text
+# that bypasses the Claude Code hook (the hosted GitHub MCP server's footer, the
+# "Create PR" button's session link): strips forbidden attribution from the PR,
+# issue, comment or review that triggered the run, and fails a PR whose commits
+# carry Claude trailers. Logic in .claude/hooks/attribution.py.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce attribution settings
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .claude/hooks/attribution.py enforce-github
