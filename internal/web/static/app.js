@@ -32,6 +32,8 @@ const ICONS = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg>',
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
 
@@ -138,6 +140,22 @@ function toast(msg) {
   const t = h('div', { class: 'toast', role: 'alert' }, msg);
   document.body.append(t);
   setTimeout(() => t.remove(), 6000);
+}
+
+// copyText puts text on the clipboard. The Clipboard API needs a secure
+// context (localhost is one); the textarea fallback covers the rest.
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = h('textarea', { readonly: true, style: 'position:fixed;top:0;left:0;opacity:0' });
+  ta.value = text;
+  document.body.append(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  ta.remove();
+  if (!ok) throw new Error('copy not allowed');
 }
 
 // keepFocus runs a re-render and gives focus back to the element carrying
@@ -646,6 +664,7 @@ function closeSession() {
   v.closed = true;
   state.view = null;
   clearTimeout(v.timer);
+  clearTimeout(v.copiedTimer);
   window.removeEventListener('resize', v.onWindowResize);
   if (v.ws) v.ws.close();
   v.term.dispose();
@@ -737,10 +756,28 @@ function renderSessionChrome() {
       v.exited || v.conn === 'ended' ? null
         : h('button', { class: 'btn danger', type: 'button', 'data-key': 'end', onclick: () => endSession(v, label) }, icon('x'), 'End session')),
     h('div', { class: 'chips' },
-      session ? h('span', { class: 'chip' }, icon('folder'), h('span', { class: 'mono' }, session.dir)) : null,
+      session ? h('span', { class: 'chip' }, icon('folder'), h('span', { class: 'mono' }, session.dir),
+        h('button', {
+          class: 'chip-btn', type: 'button', 'data-key': 'copy-dir',
+          title: v.copied ? 'Copied' : 'Copy folder path', 'aria-label': v.copied ? 'Copied' : 'Copy folder path',
+          onclick: () => copyDir(v, session.dir),
+        }, icon(v.copied ? 'check' : 'copy'))) : null,
       session ? h('span', { class: 'chip' }, `Started ${longAge(session.created)}`) : null,
       session && connected ? h('span', { class: 'chip' }, viewers <= 1 ? 'Only you are viewing' : `${viewers} people viewing`) : null,
       h('span', { class: connected ? 'chip ok' : 'chip' }, h('span', { class: connected ? 'dot ok' : 'dot' }), connText))));
+}
+
+async function copyDir(v, dir) {
+  try {
+    await copyText(dir);
+  } catch (e) {
+    toast(`Couldn't copy the folder path: ${e.message}`);
+    return;
+  }
+  clearTimeout(v.copiedTimer);
+  v.copied = true;
+  renderSessionChrome();
+  v.copiedTimer = setTimeout(() => { v.copied = false; renderSessionChrome(); }, 1500);
 }
 
 function confirmDialog(title, text, action) {
