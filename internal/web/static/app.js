@@ -536,6 +536,49 @@ async function submitNew(form, err, submit) {
 
 // ---------- session ----------
 
+// OSC 52 payload is "<targets>;<base64 text>"; "?" asks to read the
+// clipboard, which we never allow.
+function decodeOsc52(data) {
+  const b64 = data.slice(data.indexOf(';') + 1);
+  if (!b64 || b64 === '?') return '';
+  try {
+    return new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+  } catch { return ''; }
+}
+
+// Browsers may refuse clipboard writes that don't come from a user gesture
+// (the OSC 52 arrives over the websocket) or outside a secure context. Try
+// the async API, then execCommand, and if both fail keep the text and write
+// it on the next click or key press in the terminal.
+function copyText(text, el) {
+  const legacy = () => {
+    const prev = document.activeElement;
+    const ta = h('textarea', { style: 'position:fixed;opacity:0;top:0;left:0' });
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { /* fall through */ }
+    ta.remove();
+    prev?.focus?.();
+    return ok;
+  };
+  const defer = () => {
+    const flush = () => {
+      el.removeEventListener('pointerup', flush, true);
+      el.removeEventListener('keydown', flush, true);
+      if (!legacy()) navigator.clipboard?.writeText(text).catch(() => {});
+    };
+    el.addEventListener('pointerup', flush, true);
+    el.addEventListener('keydown', flush, true);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => { if (!legacy()) defer(); });
+  } else if (!legacy()) {
+    defer();
+  }
+}
+
 function openSession(host, id) {
   const term = new Terminal({
     fontFamily: cssVar('--term-font', '"JetBrains Mono", ui-monospace, monospace'),
@@ -578,6 +621,12 @@ function openSession(host, id) {
   term.onData((d) => send(v, enc.encode(d)));
   term.onBinary((d) => send(v, Uint8Array.from(d, (c) => c.charCodeAt(0))));
   term.onResize(({ cols, rows }) => sendResize(v, cols, rows));
+  // Claude Code copies by writing an OSC 52 sequence; xterm.js ignores it.
+  term.parser.registerOscHandler(52, (data) => {
+    const text = decodeOsc52(data);
+    if (text) copyText(text, v.termEl);
+    return true;
+  });
   v.onWindowResize = () => fit.fit();
   window.addEventListener('resize', v.onWindowResize);
   connect(v);
