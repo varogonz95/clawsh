@@ -6,11 +6,13 @@ name: release-prepare
 # that into main and pushes main and the tag together, which starts release.yml.
 # To patch an older release, use release-hotfix.yml.
 #
-# Needs a repository secret RELEASE_TOKEN: a token that can push to main (a
-# fine-grained PAT with Contents: read and write, allowed past any branch
-# protection on main, plus Workflows: read and write, which GitHub requires to
-# push commits that change .github/workflows/). Tags pushed with the default GITHUB_TOKEN don't trigger
-# other workflows, so release.yml would never run.
+# Needs a secret RELEASE_TOKEN in the `release` environment (Settings >
+# Environments; the job runs in it, so main must be allowed to deploy there):
+# a token that can push to main (a fine-grained PAT with Contents: read and
+# write, allowed past any branch protection on main, plus Workflows: read and
+# write, which GitHub requires to push commits that change .github/workflows/).
+# Tags pushed with the default GITHUB_TOKEN don't trigger other workflows, so
+# release.yml would never run.
 
 on:
   workflow_dispatch:
@@ -41,6 +43,7 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    environment: release
     env:
       VERSION: ${{ inputs.version }}
       REF: ${{ inputs.ref }}

@@ -12,7 +12,8 @@ name: release-hotfix
 # release-prepare at each release, and copying an older line's version into it
 # would move it backwards.
 #
-# Needs the same RELEASE_TOKEN secret as release-prepare.yml, and the token must
+# Needs the same RELEASE_TOKEN secret as release-prepare.yml (in the `release`
+# environment, which this job runs in), and the token must
 # be allowed to push release/* branches. Picking a commit that changes
 # .github/workflows/ also needs the token's Workflows: read and write permission.
 
@@ -40,6 +41,7 @@ concurrency:
 jobs:
   hotfix:
     runs-on: ubuntu-latest
+    environment: release
     env:
       VERSION: ${{ inputs.version }}
       COMMITS: ${{ inputs.commits }}
