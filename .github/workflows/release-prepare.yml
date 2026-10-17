@@ -2,17 +2,24 @@ name: release-prepare
 
 # Cuts a release of main from the Actions tab or the CLI:
 #   gh workflow run release-prepare.yml -f version=0.2.0 [-f ref=<sha on main>]
-# It bumps plugin/.claude-plugin/plugin.json on top of the chosen commit, merges
-# that into main and pushes main and the tag together, which starts release.yml.
-# To patch an older release, use release-hotfix.yml.
+# main only takes changes through pull requests, so this runs in two halves:
+# 1. This workflow bumps plugin/.claude-plugin/plugin.json on top of the chosen
+#    commit, pushes that as release-bump/v<version> and opens a PR into main.
+# 2. Merging that PR with a merge commit (not squash or rebase, which would
+#    leave the bump commit out of main's history) starts release-tag.yml, which
+#    tags the bump commit; the tag starts release.yml.
+# If plugin.json already has the version, there's nothing to merge and the
+# chosen commit is tagged right away. To patch an older release, use
+# release-hotfix.yml.
 #
 # Needs a secret RELEASE_TOKEN in the `releases` environment (Settings >
 # Environments; the job runs in it, so main must be allowed to deploy there):
-# a token that can push to main (a fine-grained PAT with Contents: read and
-# write, allowed past any branch protection on main, plus Workflows: read and
-# write, which GitHub requires to push commits that change .github/workflows/).
-# Tags pushed with the default GITHUB_TOKEN don't trigger other workflows, so
-# release.yml would never run.
+# a fine-grained PAT with Contents: read and write, to push the release-bump
+# branch and the tag. Tags pushed with the default GITHUB_TOKEN don't trigger
+# other workflows, so release.yml would never run. The PR itself is opened with
+# GITHUB_TOKEN, so that you, not the token's owner, can approve it; that needs
+# Settings > Actions > General > "Allow GitHub Actions to create and approve
+# pull requests".
 
 on:
   workflow_dispatch:
@@ -33,6 +40,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write # open the release PR with GITHUB_TOKEN
 
 # Shared with release-hotfix.yml: one release runs at a time and at most one
 # waits; a newer dispatch cancels the waiting one, so dispatch the next release
@@ -81,6 +89,12 @@ jobs:
             echo "::error::Tag $tag already exists"
             exit 1
           fi
+          # Two release PRs would both bump plugin.json and the second would conflict.
+          pending=$(git ls-remote --heads origin 'release-bump/*' | sed 's|.*refs/heads/||')
+          if [[ -n $pending ]]; then
+            echo "::error::A release PR is still open ($pending). Merge it, or close it and delete the branch, then run this again."
+            exit 1
+          fi
           highest=$(highest_stable)
           if [[ -n $highest ]] && ! version_gt "$VERSION" "$highest"; then
             echo "::error::$VERSION is not newer than the latest release v$highest. To patch an older line, use release-hotfix.yml"
@@ -114,7 +128,9 @@ jobs:
           echo "TAG=$tag" >> "$GITHUB_ENV"
           echo "SHA=$sha" >> "$GITHUB_ENV"
 
-      - name: Bump, tag and push
+      - name: Bump and open the release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           source "$RUNNER_TEMP/lib.sh"
@@ -124,31 +140,37 @@ jobs:
 
           bump_plugin "$VERSION"
           if git diff --quiet; then
-            echo "::notice::plugin.json is already at $VERSION; tagging ${SHA:0:7} as it is"
-            release=$SHA
-          else
-            git commit -qam "release: $TAG"
-            release=$(git rev-parse HEAD)
+            # Nothing to merge: SHA is on main already, so tag it now.
+            git tag -a "$TAG" -m "clawsh $TAG" "$SHA"
+            if ! git push origin "refs/tags/$TAG"; then
+              echo "::error::Pushing $TAG failed: it was created meanwhile, or RELEASE_TOKEN can't push tags."
+              exit 1
+            fi
+            {
+              echo "### Tagged $TAG"
+              echo "plugin.json is already at $VERSION, so \`${SHA:0:7}\` was tagged as it is. [release.yml](../../actions/workflows/release.yml) is publishing it."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
-          git tag -a "$TAG" -m "clawsh $TAG" "$release"
 
-          # Bring the release commit into main so the tag stays in main's history
-          # (a fast-forward when SHA is main's tip, a merge otherwise).
-          git checkout -q -B main origin/main
-          if ! git merge -q --no-edit -m "Merge $TAG into main" "$release"; then
-            git merge --abort || true
-            echo "::error::Merging $TAG into main conflicts (was plugin.json edited on main after ${SHA:0:7}?). Nothing was pushed."
+          # The base is recorded so release-tag.yml can tell a merge commit
+          # (which keeps this commit as is) from a squash or rebase (which doesn't).
+          git commit -qam "release: $TAG" -m "Release-Base: $SHA"
+          branch="release-bump/$TAG"
+          git push origin "HEAD:refs/heads/$branch"
+
+          body="Bumps \`plugin.json\` to $VERSION on top of ${SHA}.
+
+          **Merge with \"Create a merge commit\".** Merging starts [release-tag.yml]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/.github/workflows/release-tag.yml), which tags the bump commit as \`$TAG\` and so starts the release. A squash or rebase merge rewrites the bump commit, so nothing gets tagged.
+
+          To cancel the release, close this PR and delete the branch."
+          if ! url=$(gh pr create --base main --head "$branch" --title "release: $TAG" --body "$body"); then
+            echo "::error::Pushed $branch but could not open the PR (is \"Allow GitHub Actions to create and approve pull requests\" on?). Open it by hand: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch"
             exit 1
           fi
-
-          # Atomic: main and the tag land together or not at all, so nothing is
-          # published unless main has the bump.
-          if ! git push --atomic origin main "refs/tags/$TAG"; then
-            echo "::error::Push rejected: main moved during the run, or RELEASE_TOKEN can't push to main. Nothing was pushed; re-run."
-            exit 1
-          fi
-
           {
-            echo "### Tagged $TAG"
-            echo "Commit \`${release:0:7}\` (based on \`${SHA:0:7}\`), merged into main. [release.yml](../../actions/workflows/release.yml) is publishing it."
+            echo "### Release PR for $TAG"
+            echo "Commit \`$(git rev-parse --short HEAD)\` (based on \`${SHA:0:7}\`): $url"
+            echo
+            echo "Merge it with a merge commit to tag and publish $TAG."
           } >> "$GITHUB_STEP_SUMMARY"
