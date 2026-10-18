@@ -77,9 +77,14 @@ func runUpdate(args []string) error {
 	}
 
 	if *check {
-		if !isDevBuild() && update.Compare(target, cur) <= 0 {
+		switch c := update.Compare(target, cur); {
+		case isDevBuild():
+			fmt.Printf("clawsh %s is available (you have %s)\n", target, cur)
+		case c == 0 || (c < 0 && *version == ""):
 			fmt.Printf("clawsh %s is up to date\n", cur)
-		} else {
+		case c < 0:
+			fmt.Printf("clawsh %s is older than the installed %s\n", target, cur)
+		default:
 			fmt.Printf("clawsh %s is available (you have %s)\n", target, cur)
 		}
 		return nil

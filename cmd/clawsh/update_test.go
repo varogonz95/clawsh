@@ -66,6 +66,10 @@ func TestUpdateCommand(t *testing.T) {
 		t.Fatalf("--check: %v\n%s", err, out)
 	}
 
+	if out, err := runBin(old, env, "update", "--check", "--version", "0.0.1"); err != nil || !strings.Contains(out, "0.0.1 is older than the installed 0.1.0") {
+		t.Fatalf("--check older: %v\n%s", err, out)
+	}
+
 	if out, err := runBin(old, append(env, "CLAWSH_LAUNCHER=npm"), "update"); err == nil || !strings.Contains(out, "installed with npm: run npm install -g clawsh@latest") {
 		t.Fatalf("npm: %v\n%s", err, out)
 	}
