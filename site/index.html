@@ -169,11 +169,36 @@
 .diagram .you-s { fill: var(--deep-dim); }
 .diagram .line { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1 9; }
 
-/* use cases */
+/* use cases: a grid without JS, a swappable stack of cards with it */
 .cases { display: grid; gap: 16px; margin-top: 36px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
 .case { background: var(--foam); border: 1px solid var(--rule); border-radius: 14px; padding: 22px; }
 .case .n { display: block; font-family: var(--display); color: var(--shell); font-size: 1.5rem; line-height: 1; margin-bottom: 10px; }
 .case p { margin: 0; color: var(--ink-soft); }
+.uc-wrap { max-width: 520px; margin: 40px auto 0; }
+.uc-deck { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0; padding-bottom: 28px; touch-action: pan-y; }
+.uc-deck .case {
+  grid-area: 1 / 1; padding: 28px; box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--ink) 55%, transparent);
+  transform-origin: 50% 100%;
+  transition: transform .4s cubic-bezier(.3,.8,.3,1), opacity .3s ease;
+  z-index: calc(10 - var(--o));
+}
+.uc-deck .case h3 { font-size: 1.25rem; }
+.uc-deck .case[data-o="0"] { transform: none; }
+.uc-deck .case[data-o="1"] { transform: translateY(14px) scale(.95); }
+.uc-deck .case[data-o="2"] { transform: translateY(28px) scale(.9); }
+.uc-deck .case[data-o="1"], .uc-deck .case[data-o="2"] { filter: saturate(.8); }
+.uc-deck .case[data-o="far"] { transform: translateY(28px) scale(.9); opacity: 0; pointer-events: none; }
+.uc-deck .case[data-o="gone"] { transform: translateX(-70%) rotate(-7deg); opacity: 0; pointer-events: none; }
+.uc-nav { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 8px; }
+.uc-nav button {
+  width: 46px; height: 46px; border-radius: 50%; cursor: pointer; font: inherit; font-size: 1.3rem; line-height: 1;
+  background: var(--shell); color: var(--shell-ink); border: 0;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--shell) 55%, var(--ink));
+}
+.uc-nav button:hover { transform: translateY(1px); }
+.uc-nav button:active { transform: translateY(3px); box-shadow: none; }
+.uc-count { font-family: var(--mono); font-stretch: 87.5%; font-size: .85rem; color: var(--ink-soft); min-width: 5ch; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .uc-deck .case { transition: none; } .uc-nav button:hover, .uc-nav button:active { transform: none; } }
 
 /* roadmap */
 .road { display: grid; gap: 16px; margin-top: 36px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
@@ -817,6 +842,59 @@ token = "paste-token-from-desk"</pre>
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; wake(); }).observe(stage);
   document.addEventListener("visibilitychange", wake);
   wake();
+})();
+</script>
+
+<script>
+// Use cases: turn the grid into a stack of cards you swap with the arrows, the arrow keys or a swipe.
+(() => {
+  const grid = document.querySelector("#cases .cases");
+  if (!grid) return;
+  const cards = [...grid.children];
+  const n = cards.length;
+  let cur = 0;
+  const wrap = document.createElement("div");
+  wrap.className = "uc-wrap";
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-roledescription", "carousel");
+  wrap.setAttribute("aria-label", "Use cases");
+  grid.parentNode.insertBefore(wrap, grid);
+  wrap.appendChild(grid);
+  grid.classList.add("uc-deck");
+  grid.setAttribute("aria-live", "polite");
+  const nav = document.createElement("div");
+  nav.className = "uc-nav";
+  nav.innerHTML = '<button type="button" aria-label="Previous use case">\u2039</button><span class="uc-count" aria-hidden="true"></span><button type="button" aria-label="Next use case">\u203a</button>';
+  wrap.appendChild(nav);
+  const [prev, next] = nav.querySelectorAll("button");
+  const count = nav.querySelector(".uc-count");
+  function show() {
+    cards.forEach((c, i) => {
+      const o = (i - cur + n) % n;
+      c.dataset.o = o === 0 ? "0" : o === n - 1 ? "gone" : o <= 2 ? String(o) : "far";
+      c.setAttribute("aria-roledescription", "slide");
+      c.setAttribute("aria-label", (i + 1) + " of " + n);
+      c.toggleAttribute("inert", o !== 0);
+      c.setAttribute("aria-hidden", String(o !== 0));
+      c.style.setProperty("--o", o);
+    });
+    count.textContent = (cur + 1) + " / " + n;
+  }
+  const go = d => { cur = (cur + d + n) % n; show(); };
+  prev.addEventListener("click", () => go(-1));
+  next.addEventListener("click", () => go(1));
+  wrap.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
+    if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
+  });
+  let x0 = null;
+  grid.addEventListener("pointerdown", e => { x0 = e.clientX; });
+  grid.addEventListener("pointerup", e => {
+    if (x0 !== null && Math.abs(e.clientX - x0) > 40) go(e.clientX < x0 ? 1 : -1);
+    x0 = null;
+  });
+  grid.addEventListener("pointercancel", () => { x0 = null; });
+  show();
 })();
 </script>
 
