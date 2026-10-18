@@ -189,7 +189,18 @@ function olderVersion(a, b) {
   if (x.pre === y.pre) return false;
   if (!x.pre) return false; // a release is above any pre-release
   if (!y.pre) return true;
-  return x.pre < y.pre;
+  // semver: dot-separated identifiers, numeric ones compare as numbers and sort below text
+  const xs = x.pre.split('.');
+  const ys = y.pre.split('.');
+  for (let i = 0; i < Math.min(xs.length, ys.length); i++) {
+    if (xs[i] === ys[i]) continue;
+    const xn = /^\d+$/.test(xs[i]);
+    const yn = /^\d+$/.test(ys[i]);
+    if (xn && yn) return +xs[i] < +ys[i];
+    if (xn !== yn) return xn;
+    return xs[i] < ys[i];
+  }
+  return xs.length < ys.length;
 }
 
 function connectEvents() {
