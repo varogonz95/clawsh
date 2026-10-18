@@ -1,7 +1,8 @@
 name: claude
 
 # Claude reviews every PR (on open, on each push, and when it leaves draft)
-# with inline comments, and answers "@claude ..." in PR/issue comments.
+# with inline comments, reviews again when a PR is assigned to Claude (drafts
+# too), and answers "@claude ..." in PR/issue comments.
 # Needs the secret CLAUDE_CODE_OAUTH_TOKEN (run `claude setup-token`, then add
 # it under Settings > Secrets and variables > Actions) and the Claude GitHub
 # App installed on the repo (https://github.com/apps/claude).
@@ -10,7 +11,7 @@ name: claude
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [opened, synchronize, ready_for_review, reopened, assigned]
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -25,7 +26,10 @@ concurrency:
 
 jobs:
   review:
-    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    if: |
+      github.event_name == 'pull_request' && (
+        (github.event.action == 'assigned' && github.event.assignee.login == 'Claude') ||
+        (github.event.action != 'assigned' && !github.event.pull_request.draft))
     runs-on: ubuntu-latest
     permissions:
       contents: read
