@@ -28,8 +28,16 @@ func releasesURL() string {
 
 func isDevBuild() bool { return strings.HasPrefix(api.Version, "dev") }
 
+// launchedByNPM is read once at start and the variable removed, so agents and
+// sessions this process spawns don't inherit it.
+var launchedByNPM = func() bool {
+	v := os.Getenv("CLAWSH_LAUNCHER") == "npm"
+	os.Unsetenv("CLAWSH_LAUNCHER")
+	return v
+}()
+
 func installedWithNPM(exe string) bool {
-	if os.Getenv("CLAWSH_LAUNCHER") == "npm" {
+	if launchedByNPM {
 		return true
 	}
 	for _, p := range strings.Split(filepath.ToSlash(exe), "/") {
