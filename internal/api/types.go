@@ -100,6 +100,7 @@ type HostOverview struct {
 // ConfigError is set while hosts.toml doesn't parse; Hosts then holds the
 // last hosts that did.
 type Overview struct {
+	Version     string         `json:"version"` // the hub's clawsh version
 	ConfigPath  string         `json:"config_path"`
 	ConfigError string         `json:"config_error,omitempty"`
 	Hosts       []HostOverview `json:"hosts"`
