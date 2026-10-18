@@ -3,16 +3,23 @@
 package update
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 // Replace puts newBin in place of exe. A running .exe can be renamed but not
 // overwritten, so the old one moves to exe+".old" (removed by CleanupOld on a
 // later start). On failure the old binary is put back.
 func Replace(exe, newBin string) error {
+	// A still-running process from an earlier update holds exe+".old" open,
+	// so it can't be removed: use a unique name instead.
 	old := exe + ".old"
-	os.Remove(old)
+	if err := os.Remove(old); err != nil && !os.IsNotExist(err) {
+		old = fmt.Sprintf("%s.old.%d", exe, os.Getpid())
+		os.Remove(old)
+	}
 	if err := os.Rename(exe, old); err != nil {
 		return err
 	}
@@ -46,5 +53,11 @@ func moveFile(src, dst string) error {
 	return out.Close()
 }
 
-// CleanupOld removes the leftover exe+".old" from an earlier update (best effort).
-func CleanupOld(exe string) { os.Remove(exe + ".old") }
+// CleanupOld removes leftover exe+".old*" files from earlier updates (best
+// effort; ones still in use fail and are retried on a later start).
+func CleanupOld(exe string) {
+	matches, _ := filepath.Glob(exe + ".old*")
+	for _, m := range matches {
+		os.Remove(m)
+	}
+}
