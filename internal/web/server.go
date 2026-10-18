@@ -78,7 +78,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	// The page and its assets hold no secrets; everything that does is under /api.
 	mux.HandleFunc("GET /{$}", s.serveIndex)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", s.cacheStatic(http.FileServerFS(static))))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", s.cacheStatic(static, http.FileServerFS(static))))
 	mux.Handle("GET /api/events", s.api(s.events))
 	mux.Handle("POST /api/hosts/{host}/sessions", s.api(s.create))
 	mux.Handle("DELETE /api/hosts/{host}/sessions/{id}", s.api(s.remove))
@@ -110,8 +110,12 @@ func versionedIndex(b []byte, version string) []byte {
 
 // cacheStatic makes browsers revalidate static files. The embed FS has no
 // modtime, so the ETag is the version plus the path.
-func (s *Server) cacheStatic(next http.Handler) http.Handler {
+func (s *Server) cacheStatic(files fs.FS, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := fs.Stat(files, strings.TrimPrefix(r.URL.Path, "/")); err != nil {
+			next.ServeHTTP(w, r) // let the file server answer 404
+			return
+		}
 		etag := `"` + api.Version + `:` + r.URL.Path + `"`
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("ETag", etag)

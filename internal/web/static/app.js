@@ -36,6 +36,7 @@ const RELOAD_STORE = 'clawsh.reloadedFor';
 // sorts below its release. Returns null when either side isn't a version
 // (dev builds), so callers never flag those.
 function parseSemver(v) {
+  if (/-\d+-g[0-9a-f]+|-dirty$/.test(String(v))) return null; // git describe: a build past a tag
   const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(String(v || ''));
   return m ? { core: [+m[1], +m[2], +m[3]], pre: m[4] || '' } : null;
 }
@@ -46,7 +47,8 @@ function semverCmp(a, b) {
   if (x.pre === y.pre) return 0;
   if (!x.pre) return 1;
   if (!y.pre) return -1;
-  return x.pre < y.pre ? -1 : 1;
+  const c = x.pre.localeCompare(y.pre, 'en', { numeric: true });
+  return c < 0 ? -1 : c > 0 ? 1 : 0;
 }
 
 // hostOlder reports whether a host runs an older clawsh than this hub.

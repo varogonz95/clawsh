@@ -107,3 +107,17 @@ func TestStaticRevalidates(t *testing.T) {
 		t.Errorf("status = %s, want 304", resp.Status)
 	}
 }
+
+func TestStaticMissingIs404(t *testing.T) {
+	_, base := startServer(t, noHosts(t))
+	req, _ := http.NewRequest(http.MethodGet, base+"/static/nope.js", nil)
+	req.Header.Set("If-None-Match", `"`+api.Version+`:/nope.js"`)
+	resp, err := login(t, base).Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound || resp.Header.Get("ETag") != "" {
+		t.Errorf("status %s, ETag %q", resp.Status, resp.Header.Get("ETag"))
+	}
+}
