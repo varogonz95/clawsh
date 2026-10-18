@@ -9,8 +9,12 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"html"
 	"io/fs"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -74,7 +78,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	// The page and its assets hold no secrets; everything that does is under /api.
 	mux.HandleFunc("GET /{$}", s.serveIndex)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", revalidate(http.FileServerFS(static))))
 	mux.Handle("GET /api/events", s.api(s.events))
 	mux.Handle("POST /api/hosts/{host}/sessions", s.api(s.create))
 	mux.Handle("DELETE /api/hosts/{host}/sessions/{id}", s.api(s.remove))
@@ -91,8 +95,40 @@ func (s *Server) routes() *http.ServeMux {
 	return mux
 }
 
-func (s *Server) serveIndex(w http.ResponseWriter, _ *http.Request) {
+var staticRef = regexp.MustCompile(`="(/static/[^"?]+)"`)
+
+// revalidate makes browsers check /static/ files on every load. The embed FS
+// has no modtime, so the ETag is the hub version plus the path; a new version
+// changes every ETag.
+func revalidate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		etag := `"` + api.Version + `:` + r.URL.Path + `"`
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("ETag", etag)
+		for _, c := range strings.Split(r.Header.Get("If-None-Match"), ",") {
+			if strings.TrimSpace(c) == etag {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// indexHTML returns index.html with the hub version in a meta tag and on
+// every /static/ URL, so a new version never runs an old cached script.
+func indexHTML() ([]byte, error) {
 	b, err := staticFiles.ReadFile("static/index.html")
+	if err != nil {
+		return nil, err
+	}
+	out := staticRef.ReplaceAll(b, []byte(`="$1?v=`+url.QueryEscape(api.Version)+`"`))
+	meta := `<meta name="clawsh-version" content="` + html.EscapeString(api.Version) + `">` + "\n</head>"
+	return []byte(strings.Replace(string(out), "</head>", meta, 1)), nil
+}
+
+func (s *Server) serveIndex(w http.ResponseWriter, _ *http.Request) {
+	b, err := indexHTML()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

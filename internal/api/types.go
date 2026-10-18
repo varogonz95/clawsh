@@ -99,7 +99,9 @@ type HostOverview struct {
 // Overview is the payload of the web UI's "overview" event.
 // ConfigError is set while hosts.toml doesn't parse; Hosts then holds the
 // last hosts that did.
+// Version is the hub's clawsh version; a page running another one reloads.
 type Overview struct {
+	Version     string         `json:"version"`
 	ConfigPath  string         `json:"config_path"`
 	ConfigError string         `json:"config_error,omitempty"`
 	Hosts       []HostOverview `json:"hosts"`

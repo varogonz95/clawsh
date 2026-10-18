@@ -10,6 +10,8 @@ const HOST_COLORS = cssVar('--host-colors', '#6a9cf2, #f0b43c, #52c27f, #e8875a,
 const AUTH_ERROR = 'access key rejected'; // hub.ErrMsgAuth
 const CLOSE_NOT_FOUND = 4404; // web.closeNotFound
 const CLOSE_UNREACHABLE = 4502; // web.closeUnreachable
+const RELOADED_KEY = 'clawsh.reloadedFor';
+const PAGE_VERSION = (document.querySelector('meta[name="clawsh-version"]') || {}).content || '';
 const KEY_STORE = 'clawsh_key';
 
 // takeKey moves the access key from the opened link (?k=…) into
@@ -38,6 +40,7 @@ const ICONS = {
 const app = document.getElementById('app');
 const state = {
   overview: null,       // {config_path, config_error?, hosts}, from the last SSE event
+  stale: false,         // the hub runs another version than this page and a reload didn't fix it
   live: 'connecting',   // connecting | live | reconnecting | signed-out
   view: null,           // the open session, see openSession
   dismissing: new Set(), // "host/id" of exited sessions being dismissed
@@ -154,11 +157,47 @@ function go(hash) { location.hash = hash; }
 
 // ---------- live data ----------
 
+// checkVersion reloads once into a new clawsh web version. The hash survives
+// the reload, so a session view comes back. If a reload for this version was
+// already tried, show a banner instead of looping.
+function checkVersion(hubVersion) {
+  if (!hubVersion || !PAGE_VERSION || hubVersion === PAGE_VERSION) return;
+  let tried = null;
+  try { tried = sessionStorage.getItem(RELOADED_KEY); } catch (e) { /* storage blocked */ }
+  if (tried === hubVersion) {
+    state.stale = true;
+    return;
+  }
+  try { sessionStorage.setItem(RELOADED_KEY, hubVersion); } catch (e) { state.stale = true; return; }
+  location.reload();
+}
+
+// parseVersion splits "1.2.3-rc.1" into its numeric core and pre-release;
+// dev builds ("dev", "dev+abc") give null.
+function parseVersion(v) {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(v || '');
+  return m ? { core: [+m[1], +m[2], +m[3]], pre: m[4] || '' } : null;
+}
+
+// olderVersion reports whether a is a release behind b. Unknown or dev
+// versions are never older.
+function olderVersion(a, b) {
+  const x = parseVersion(a);
+  const y = parseVersion(b);
+  if (!x || !y) return false;
+  for (let i = 0; i < 3; i++) if (x.core[i] !== y.core[i]) return x.core[i] < y.core[i];
+  if (x.pre === y.pre) return false;
+  if (!x.pre) return false; // a release is above any pre-release
+  if (!y.pre) return true;
+  return x.pre < y.pre;
+}
+
 function connectEvents() {
   // EventSource and WebSocket can't set headers, so they carry the key in the query.
   const es = new EventSource(`/api/events?k=${encodeURIComponent(KEY)}`);
   es.addEventListener('overview', (e) => {
     state.overview = JSON.parse(e.data);
+    checkVersion(state.overview.version);
     state.live = 'live';
     render();
   });
@@ -199,7 +238,19 @@ function onRoute() {
   render();
 }
 
+// staleBanner sits outside #app so every view keeps it.
+function syncStaleBanner() {
+  const old = document.getElementById('stale');
+  if (!state.stale) { if (old) old.remove(); return; }
+  if (old) return;
+  const el = h('div', { id: 'stale', class: 'banner config-error', role: 'alert' },
+    'clawsh was updated. Reload to finish. ',
+    h('button', { class: 'btn small', type: 'button', onclick: () => location.reload() }, 'Reload'));
+  document.body.prepend(el);
+}
+
 function render() {
+  syncStaleBanner();
   if (state.live === 'signed-out') { renderSignedOut(); return; }
   const r = parseRoute();
   if (r.name === 'session') { renderSessionChrome(); return; }
@@ -253,13 +304,24 @@ function dashboard(ov) {
   ];
 }
 
+// versionLine shows the agent's clawsh version and flags one behind the hub.
+function versionLine(host) {
+  const v = host.health && host.health.version;
+  if (!v) return null;
+  const old = olderVersion(v, state.overview && state.overview.version);
+  return h('div', { class: 'mono small muted', 'data-testid': 'host-version' },
+    `clawsh ${v}`,
+    old ? [' ', h('span', { class: 'pill warn' }, 'older than this hub'), ` run \`clawsh update\` on ${host.name}`] : null);
+}
+
 function hostCard(host) {
   return h('section', { class: 'card' },
     h('div', { class: 'card-head' },
       tile(host.name, true),
       h('div', { class: 'grow' },
         h('h2', {}, host.name),
-        h('div', { class: 'mono small muted' }, `${host.health.os} · ${hostAddr(host.url)}`)),
+        h('div', { class: 'mono small muted' }, `${host.health.os} · ${hostAddr(host.url)}`),
+        versionLine(host)),
       h('span', { class: 'pill ok' }, 'Online')),
     host.sessions.map((s) => sessionRow(host.name, s)),
     h('div', { class: 'card-foot' },
@@ -363,7 +425,8 @@ function hostsPage(ov) {
       : h('span', { class: 'pill warn' }, o.error === AUTH_ERROR ? 'Key rejected' : 'Offline');
     return h('li', { class: 'host-row' },
       tile(x.name, !!(o && o.online)),
-      h('div', { class: 'grow' }, h('strong', {}, x.name), h('div', { class: 'mono small muted' }, hostAddr(x.url))),
+      h('div', { class: 'grow' }, h('strong', {}, x.name), h('div', { class: 'mono small muted' }, hostAddr(x.url)),
+        o && o.online ? versionLine(o) : null),
       status,
       h('button', { class: 'btn ghost small', type: 'button', onclick: () => openHostDialog(x) }, 'Edit'),
       h('button', { class: 'btn danger small', type: 'button', onclick: () => removeHost(x) }, 'Remove'));
