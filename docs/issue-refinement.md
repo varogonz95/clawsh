@@ -3,6 +3,7 @@
 Issues are refined until an AI agent can pick one up and ship it on autopilot: one issue, one PR, no questions
 back. This file is the contract for both the refinement agent and the implementation agent. It follows the same
 model as `varogonz95/sproutlings-mobile` and `varogonz95/FloraBytes-PIO`, adapted to clawsh.
+The stages after refinement (planning, review, testing, PR) are in [`sdlc-pipeline.md`](sdlc-pipeline.md).
 
 ## Labels
 
