@@ -5,9 +5,10 @@ name: release-prepare
 # main only takes changes through pull requests, so this runs in two halves:
 # 1. This workflow bumps plugin/.claude-plugin/plugin.json on top of the chosen
 #    commit, pushes that as release-bump/v<version> and opens a PR into main.
-# 2. Merging that PR with a merge commit (not squash or rebase, which would
-#    leave the bump commit out of main's history) starts release-tag.yml, which
-#    tags the bump commit; the tag starts release.yml.
+# 2. Merging that PR starts release-tag.yml, which tags the release; the tag
+#    starts release.yml. Use a merge commit: a squash or rebase is tagged only if
+#    main hasn't moved since this ran, since otherwise it would add commits on
+#    top of the chosen one.
 # If plugin.json already has the version, there's nothing to merge and the
 # chosen commit is tagged right away. To patch an older release, use
 # release-hotfix.yml.
@@ -161,7 +162,7 @@ jobs:
 
           body="Bumps \`plugin.json\` to $VERSION on top of ${SHA}.
 
-          **Merge with \"Create a merge commit\".** Merging starts [release-tag.yml]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/.github/workflows/release-tag.yml), which tags the bump commit as \`$TAG\` and so starts the release. A squash or rebase merge rewrites the bump commit, so nothing gets tagged.
+          **Merge with \"Create a merge commit\".** Merging starts [release-tag.yml]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/.github/workflows/release-tag.yml), which tags the release as \`$TAG\` and so starts it. A squash or rebase merge is tagged only if \`main\` hasn't moved past ${SHA:0:7} by then.
 
           To cancel the release, close this PR and delete the branch."
           if ! url=$(gh pr create --base main --head "$branch" --title "release: $TAG" --body "$body"); then
