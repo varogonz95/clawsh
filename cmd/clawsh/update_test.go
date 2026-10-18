@@ -91,3 +91,14 @@ func TestUpdateRefusesDevBuild(t *testing.T) {
 		t.Fatalf("%v\n%s", err, out)
 	}
 }
+
+func TestUpdateRefusesDescribeBuild(t *testing.T) {
+	s := fakeRelease(t)
+	for _, v := range []string{"0.1.0-3-gabc1234", "0.1.0-dirty"} {
+		bin := buildClawsh(t, v)
+		out, err := runBin(bin, []string{"CLAWSH_RELEASES_URL=" + s.URL, "CLAWSH_LAUNCHER="}, "update")
+		if err == nil || !strings.Contains(out, "this is a development build") {
+			t.Fatalf("%s: %v\n%s", v, err, out)
+		}
+	}
+}

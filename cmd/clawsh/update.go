@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -26,7 +27,13 @@ func releasesURL() string {
 	return update.DefaultBase
 }
 
-func isDevBuild() bool { return strings.HasPrefix(api.Version, "dev") }
+// localBuildRE matches `git describe` output for a build past a tag
+// (0.1.0-3-gabc1234) or with local changes (…-dirty).
+var localBuildRE = regexp.MustCompile(`-[0-9]+-g[0-9a-f]+|-dirty$`)
+
+func isDevBuild() bool {
+	return strings.HasPrefix(api.Version, "dev") || localBuildRE.MatchString(api.Version)
+}
 
 // launchedByNPM is read once at start and the variable removed, so agents and
 // sessions this process spawns don't inherit it.
