@@ -6,7 +6,9 @@
 package web
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"html"
@@ -78,7 +80,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	// The page and its assets hold no secrets; everything that does is under /api.
 	mux.HandleFunc("GET /{$}", s.serveIndex)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", revalidate(http.FileServerFS(static))))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", revalidate(static, http.FileServerFS(static))))
 	mux.Handle("GET /api/events", s.api(s.events))
 	mux.Handle("POST /api/hosts/{host}/sessions", s.api(s.create))
 	mux.Handle("DELETE /api/hosts/{host}/sessions/{id}", s.api(s.remove))
@@ -98,11 +100,15 @@ func (s *Server) routes() *http.ServeMux {
 var staticRef = regexp.MustCompile(`="(/static/[^"?]+)"`)
 
 // revalidate makes browsers check /static/ files on every load. The embed FS
-// has no modtime, so the ETag is the hub version plus the path; a new version
-// changes every ETag.
-func revalidate(next http.Handler) http.Handler {
+// has no modtime, so the ETag is the hub version, the path and a hash of the
+// content: builds that share a version string (dev) still get new ETags.
+func revalidate(root fs.FS, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		etag := `"` + api.Version + `:` + r.URL.Path + `"`
+		if b, err := fs.ReadFile(root, r.URL.Path); err == nil {
+			sum := sha256.Sum256(b)
+			etag = `"` + api.Version + `:` + r.URL.Path + `:` + hex.EncodeToString(sum[:8]) + `"`
+		}
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("ETag", etag)
 		for _, c := range strings.Split(r.Header.Get("If-None-Match"), ",") {
