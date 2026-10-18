@@ -67,19 +67,51 @@ kbd {
 /* header */
 .top { display: flex; justify-content: space-between; align-items: center; padding-block: 22px; }
 .top .mark { font-size: 1.6rem; }
-.brand { display: flex; align-items: center; gap: 10px; }
-.release {
-  font: 600 .75rem/1 var(--mono); font-stretch: 87.5%;
-  color: var(--ink-soft); text-decoration: none; white-space: nowrap;
-  border: 1px solid var(--rule); border-radius: 999px; padding: 4px 8px;
+.top nav a.release {
+  font: 600 .6875rem/1 var(--mono); font-stretch: 87.5%; white-space: nowrap;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 3px 7px;
 }
-.release:hover { color: var(--ink); border-color: var(--ink-soft); }
-.top nav { display: flex; gap: 22px; }
+.top nav a.release:hover { text-decoration: none; border-color: var(--ink-soft); }
+.top nav { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 22px; }
 .top nav a { text-decoration: none; color: var(--ink-soft); }
 .top nav a:hover { color: var(--ink); text-decoration: underline; }
-@media (max-width: 479px) { .top { gap: 16px; } .top nav { gap: 14px; font-size: .95rem; } }
-/* Phones: the label goes under the logo, so the nav keeps its room. */
-@media (max-width: 559px) { .brand { flex-direction: column; align-items: flex-start; gap: 4px; } .release { font-size: .6875rem; padding: 3px 7px; } }
+@media (max-width: 479px) { .top { gap: 16px; } .top nav { gap: 6px 14px; font-size: .95rem; } }
+
+/* tablet and phone menu (nav.js): the nav moves into a side panel */
+.menu-btn { display: none; }
+@media (max-width: 899px) {
+  .js .top nav { display: none; }
+  .js .menu-btn { display: inline-flex; }
+}
+.menu-btn, .menu-close {
+  align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -10px;
+  border: 0; border-radius: 10px; background: none; color: var(--ink); cursor: pointer;
+}
+.menu-close { display: inline-flex; }
+.menu-btn:hover, .menu-close:hover { background: var(--foam); }
+.menu-btn svg, .menu-close svg { width: 24px; height: 24px; }
+.menu {
+  position: fixed; inset: 0 0 0 auto; margin: 0; padding: 0;
+  width: min(84vw, 320px); max-width: none; height: 100dvh; max-height: none;
+  border: 0; border-left: 1px solid var(--rule); background: var(--sea); color: var(--ink);
+  box-shadow: -12px 0 32px rgb(0 0 0 / .18);
+}
+.menu[open] { display: flex; flex-direction: column; animation: menu-in .22s ease-out; }
+.menu::backdrop { background: rgb(6 20 19 / .45); animation: menu-fade .22s ease-out; }
+html:has(.menu[open]) { overflow: hidden; }
+.menu-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 16px 10px 24px; }
+.menu-head .mark { font-size: 1.4rem; }
+.menu nav { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 24px; overflow-y: auto; }
+.menu nav a { padding: 12px; border-radius: 10px; font-size: 1.125rem; color: var(--ink); text-decoration: none; }
+.menu nav a:hover { background: var(--foam); }
+.menu nav a[aria-current="page"] { font-weight: 700; }
+.menu nav a.release {
+  align-self: flex-start; margin: 14px 12px 0; padding: 4px 9px; border: 1px solid var(--rule); border-radius: 999px;
+  font: 600 .75rem/1 var(--mono); font-stretch: 87.5%; color: var(--ink-soft);
+}
+@keyframes menu-in { from { transform: translateX(100%); } }
+@keyframes menu-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .menu[open], .menu::backdrop { animation: none; } }
 
 /* hero */
 .hero { padding-block: 40px 88px; }
