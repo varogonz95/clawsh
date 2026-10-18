@@ -1,10 +1,17 @@
 name: release-tag
 
 # Second half of release-prepare.yml: when its release PR (release-bump/v<version>)
-# is merged into main, this tags the PR's bump commit, which starts release.yml.
-# The bump commit is recognized by its subject ("release: v<version>") and its
-# Release-Base trailer; it must still sit on that base, which only a merge
-# commit keeps. A squash or rebase merge is reported and nothing is tagged.
+# is merged into main, this tags the release, which starts release.yml.
+# The bump commit is recognized by its subject ("release: v<version>", or
+# "release: v<version> (#<pr>)" when squashed) and its Release-Base trailer.
+# It is tagged only if its parent is still that base, so the tag holds exactly
+# the chosen commit plus the bump: a merge commit always keeps that, and a
+# squash or rebase does when main hadn't moved since release-prepare ran.
+# Otherwise it is reported and nothing is tagged.
+#
+# It runs on every push to main, not only ones that change plugin.json: a
+# release PR merged after main already got the version (say, after a squashed
+# one) changes nothing there but still has to be tagged.
 #
 # Tagging needs the RELEASE_TOKEN secret from the `releases` environment (see
 # release-prepare.yml), because tags pushed with GITHUB_TOKEN don't start
@@ -13,7 +20,6 @@ name: release-tag
 on:
   push:
     branches: [main]
-    paths: ["plugin/.claude-plugin/plugin.json"]
 
 permissions:
   contents: read
@@ -40,15 +46,11 @@ jobs:
         run: |
           set -euo pipefail
           source scripts/release/lib.sh
-          release_re='^release: v([^ ]+)$'
-          squash_re='^release: v([^ ]+) \(#[0-9]+\)$'
+          # A squash merge appends " (#<pr>)" to the subject.
+          release_re='^release: v([^ ]+)( \(#[0-9]+\))?$'
           releases=()
           if [[ ! $BEFORE =~ ^0+$ ]]; then
             while IFS=$'\t' read -r c subject; do
-              if [[ $subject =~ $squash_re ]]; then
-                echo "::error::${c:0:7} is a release PR merged by squash, so nothing was tagged (release PRs need a merge commit). main's plugin.json now has ${BASH_REMATCH[1]}: delete release-bump/v${BASH_REMATCH[1]} if it's still there, then run release-prepare again with that version and no ref to tag main's tip as it is."
-                exit 1
-              fi
               [[ $subject =~ $release_re ]] || continue
               version=${BASH_REMATCH[1]}
               [[ $version =~ $SEMVER_RE ]] || continue
@@ -56,13 +58,22 @@ jobs:
                 echo "::notice::v$version already exists; skipping ${c:0:7}"
                 continue
               fi
-              base=$(git log -1 --format='%(trailers:key=Release-Base,valueonly)' "$c" | head -1)
+              if [[ " ${releases[*]} " == *":$version "* ]]; then
+                echo "::notice::v$version is already being tagged; skipping ${c:0:7}"
+                continue
+              fi
+              # Read from the body, not as a git trailer: a squash merge appends a
+              # Co-authored-by paragraph after it.
+              base=$(git log -1 --format=%b "$c" | sed -n -E 's/^Release-Base: *([0-9a-f]{40}) *$/\1/p' | head -1)
               if [[ -z $base ]]; then
                 echo "::warning::${c:0:7} ($subject) has no Release-Base trailer, so it wasn't made by release-prepare; not tagging it."
                 continue
               fi
+              # A squash or rebase merge puts the bump on top of main as it was at
+              # merge time; if main had moved past the base, tagging it would
+              # release commits that weren't chosen.
               if [[ $(git rev-parse "$c^1") != "$base" ]]; then
-                echo "::error::${c:0:7} ($subject) no longer sits on ${base:0:7}: the release PR was rebased, so nothing was tagged (release PRs need a merge commit). Delete release-bump/v$version if it's still there, then run release-prepare again for $version with no ref to tag main's tip as it is."
+                echo "::error::${c:0:7} ($subject) was squashed or rebased onto commits newer than the chosen ${base:0:7}, so nothing was tagged (a merge commit avoids this). main's plugin.json now has $version: delete release-bump/v$version if it's still there, then run release-prepare for $version with ref ${c:0:7} to release main as of this merge, or with no ref to release main's tip."
                 exit 1
               fi
               plugin=$(git show "$c:plugin/.claude-plugin/plugin.json" | jq -r .version)
