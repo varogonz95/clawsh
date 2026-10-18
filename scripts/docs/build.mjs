@@ -19,8 +19,8 @@ const src = path.join(root, "docs", "wiki");
 const out = path.resolve(process.argv[2] || path.join(root, "out", "site"));
 const REPO = "https://github.com/varogonz95/clawsh";
 
-// The newest stable release (highest vX.Y.Z tag), shown next to the logo on
-// every page in place of <!--release-->. Needs the tags fetched (pages.yml
+// The newest stable release (highest vX.Y.Z tag), shown as the last item of
+// every page's main nav in place of <!--release-->. Needs the tags fetched (pages.yml
 // checks out with fetch-depth 0); without any, the label is left out.
 function latestRelease() {
   let tags = "";
@@ -123,13 +123,14 @@ function page({ file, title, html }) {
 <body>
 
 <header class="wrap top">
-  <span class="brand"><a class="mark" href="../" aria-label="clawsh home">claw<span class="sh" aria-hidden="true">sh</span></a><!--release--></span>
+  <a class="mark" href="../" aria-label="clawsh home">claw<span class="sh" aria-hidden="true">sh</span></a>
   <nav aria-label="Main">
     <a href="../#web">Web UI</a>
     <a href="../#install">Install</a>
     <a href="../cli.html">CLI</a>
     <a href="./" aria-current="page">Docs</a>
     <a href="${REPO}">GitHub</a>
+    <!--release-->
   </nav>
 </header>
 
