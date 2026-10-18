@@ -18,6 +18,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const src = path.join(root, "docs", "wiki");
 const out = path.resolve(process.argv[2] || path.join(root, "out", "site"));
 const REPO = "https://github.com/varogonz95/clawsh";
+const SITE = "https://varogonz95.github.io/clawsh/";
 
 // The newest stable release (highest vX.Y.Z tag), shown as the last item of
 // every page's main nav in place of <!--release-->. Needs the tags fetched (pages.yml
@@ -105,6 +106,14 @@ function rewrite(href, from) {
   return `${REPO}/blob/main/${target}${suffix}`;
 }
 
+// First paragraph of a page as plain text, for its meta description.
+function describe(html) {
+  const p = html.match(/<p>([\s\S]*?)<\/p>/)?.[1] ?? "";
+  const text = p.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  return text.length > 160 ? text.slice(0, text.lastIndexOf(" ", 157)) + "..." : text;
+}
+const docUrl = (file) => `${SITE}docs/${file === "Home.md" ? "" : `${slugOf(file)}.html`}`;
+
 function page({ file, title, html }) {
   const nav = sidebar.map((s) =>
     `<li><a href="${s.file === "Home.md" ? "./" : `${slugOf(s.file)}.html`}"${s.file === file ? ' aria-current="page"' : ""}>${esc(s.name)}</a></li>`).join("\n          ");
@@ -114,6 +123,17 @@ function page({ file, title, html }) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · clawsh docs</title>
+<meta name="description" content="${esc(describe(html))}">
+<link rel="canonical" href="${docUrl(file)}">
+<meta name="theme-color" content="#d63a26">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="clawsh">
+<meta property="og:title" content="${esc(title)} · clawsh docs">
+<meta property="og:description" content="${esc(describe(html))}">
+<meta property="og:url" content="${docUrl(file)}">
+<meta property="og:image" content="${SITE}img/web-dashboard.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bagel+Fat+One&family=Martian+Mono:wdth,wght@87.5,400;87.5,600&display=swap" rel="stylesheet">
@@ -184,4 +204,7 @@ for (const f of fs.readdirSync(out).filter((f) => f.endsWith(".html"))) {
   fs.writeFileSync(file, withRelease(fs.readFileSync(file, "utf8")));
 }
 for (const p of pages) fs.writeFileSync(path.join(out, "docs", `${slugOf(p.file)}.html`), withRelease(page(p)));
+const urls = [SITE, `${SITE}cli.html`, ...pages.map((p) => docUrl(p.file))];
+fs.writeFileSync(path.join(out, "sitemap.xml"),
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${u}</loc></url>`).join("\n")}\n</urlset>\n`);
 console.log(`built ${out}: site + ${pages.length} docs pages, release ${release || "none"}`);
