@@ -173,8 +173,10 @@ function checkVersion(hubVersion) {
 }
 
 // parseVersion splits "1.2.3-rc.1" into its numeric core and pre-release;
-// dev builds ("dev", "dev+abc") give null.
+// dev builds ("dev", "dev+abc") and untagged `git describe` output
+// ("1.2.3-4-gabc1234") give null.
 function parseVersion(v) {
+  if (/-\d+-g[0-9a-f]+(-dirty)?$/.test(v || '')) return null;
   const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(v || '');
   return m ? { core: [+m[1], +m[2], +m[3]], pre: m[4] || '' } : null;
 }
