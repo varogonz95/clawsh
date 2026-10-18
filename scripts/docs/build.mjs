@@ -119,6 +119,8 @@ function page({ file, title, html }) {
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bagel+Fat+One&family=Martian+Mono:wdth,wght@87.5,400;87.5,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../base.css">
 <link rel="stylesheet" href="../docs.css">
+<script>document.documentElement.classList.add("js")</script>
+<script src="../nav.js" defer></script>
 </head>
 <body>
 
