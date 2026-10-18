@@ -8,6 +8,7 @@
 // rewritten to the .html pages, links out of docs/wiki/ point at the file on
 // GitHub, and a link to a page that doesn't exist fails the build.
 // Markdown is rendered by the vendored marked (vendor/VERSIONS); no npm install.
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,24 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const src = path.join(root, "docs", "wiki");
 const out = path.resolve(process.argv[2] || path.join(root, "out", "site"));
 const REPO = "https://github.com/varogonz95/clawsh";
+
+// The newest stable release (highest vX.Y.Z tag), shown next to the logo on
+// every page in place of <!--release-->. Needs the tags fetched (pages.yml
+// checks out with fetch-depth 0); without any, the label is left out.
+function latestRelease() {
+  let tags = "";
+  try {
+    tags = execFileSync("git", ["-C", root, "tag", "-l", "v*"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  } catch {}
+  const versions = tags.split("\n").filter((t) => /^v\d+\.\d+\.\d+$/.test(t)).map((t) => t.slice(1).split(".").map(Number));
+  versions.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  return versions.length ? `v${versions.at(-1).join(".")}` : "";
+}
+const release = latestRelease();
+const releaseLabel = release
+  ? `<a class="release" href="${REPO}/releases/tag/${release}" title="Latest release">${release}</a>`
+  : "";
+const withRelease = (html) => html.replaceAll("<!--release-->", releaseLabel);
 
 const slugOf = (file) => (file === "Home.md" ? "index" : path.basename(file, ".md").toLowerCase());
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -104,7 +123,7 @@ function page({ file, title, html }) {
 <body>
 
 <header class="wrap top">
-  <a class="mark" href="../" aria-label="clawsh home">claw<span class="sh" aria-hidden="true">sh</span></a>
+  <span class="brand"><a class="mark" href="../" aria-label="clawsh home">claw<span class="sh" aria-hidden="true">sh</span></a><!--release--></span>
   <nav aria-label="Main">
     <a href="../#web">Web UI</a>
     <a href="../#install">Install</a>
@@ -157,5 +176,9 @@ if (errors.length) {
 fs.rmSync(out, { recursive: true, force: true });
 fs.cpSync(path.join(root, "site"), out, { recursive: true });
 fs.mkdirSync(path.join(out, "docs"), { recursive: true });
-for (const p of pages) fs.writeFileSync(path.join(out, "docs", `${slugOf(p.file)}.html`), page(p));
-console.log(`built ${out}: site + ${pages.length} docs pages`);
+for (const f of fs.readdirSync(out).filter((f) => f.endsWith(".html"))) {
+  const file = path.join(out, f);
+  fs.writeFileSync(file, withRelease(fs.readFileSync(file, "utf8")));
+}
+for (const p of pages) fs.writeFileSync(path.join(out, "docs", `${slugOf(p.file)}.html`), withRelease(page(p)));
+console.log(`built ${out}: site + ${pages.length} docs pages, release ${release || "none"}`);
