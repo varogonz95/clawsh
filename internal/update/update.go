@@ -19,6 +19,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,8 @@ import (
 
 // DefaultBase is the releases URL used when CLAWSH_RELEASES_URL is unset.
 const DefaultBase = "https://github.com/varogonz95/clawsh/releases"
+
+var versionRE = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
 
 // maxBinary caps the size of an extracted binary.
 const maxBinary = 512 << 20
@@ -163,6 +166,9 @@ func ArchiveName(version, goos, goarch string) string {
 // binary into dir and returns its path.
 func Download(ctx context.Context, base, version, goos, goarch, dir string) (string, error) {
 	version = strings.TrimPrefix(version, "v")
+	if !versionRE.MatchString(version) {
+		return "", fmt.Errorf("invalid version %q", version)
+	}
 	root := strings.TrimRight(base, "/") + "/download/v" + version + "/"
 	name := ArchiveName(version, goos, goarch)
 
@@ -182,7 +188,7 @@ func Download(ctx context.Context, base, version, goos, goarch, dir string) (str
 		return "", fmt.Errorf("checksums.txt has no entry for %s", name)
 	}
 
-	arch := filepath.Join(dir, name)
+	arch := filepath.Join(dir, "archive") // fixed name: nothing from the version reaches a local path
 	if err := fetchFile(ctx, root+name, arch); err != nil {
 		return "", err
 	}
@@ -198,7 +204,7 @@ func Download(ctx context.Context, base, version, goos, goarch, dir string) (str
 	if goos == "windows" {
 		bin = "clawsh.exe"
 	}
-	out := filepath.Join(dir, "new-"+bin)
+	out := filepath.Join(dir, "new-binary")
 	if goos == "windows" {
 		err = extractZip(arch, bin, out)
 	} else {

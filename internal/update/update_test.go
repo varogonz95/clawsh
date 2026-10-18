@@ -139,3 +139,11 @@ func TestReplace(t *testing.T) {
 		t.Error("temp file left behind")
 	}
 }
+
+func TestDownloadRejectsBadVersion(t *testing.T) {
+	for _, v := range []string{"../../etc/x", "1.0", "1.0.0/../x", ""} {
+		if _, err := Download(context.Background(), "http://127.0.0.1:1", v, "linux", "amd64", t.TempDir()); err == nil || !strings.Contains(err.Error(), "invalid version") {
+			t.Errorf("%q: err = %v", v, err)
+		}
+	}
+}
