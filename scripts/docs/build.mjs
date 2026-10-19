@@ -110,7 +110,11 @@ function rewrite(href, from) {
 function describe(html) {
   const p = html.match(/<p>([\s\S]*?)<\/p>/)?.[1] ?? "";
   const text = p.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
-  return text.length > 160 ? text.slice(0, text.lastIndexOf(" ", 157)) + "..." : text;
+  if (text.length <= 160) return text;
+  // Cut at the last space that fits; a first 157 characters with no space (a
+  // long URL or code token) are cut at 157 instead.
+  const cut = text.lastIndexOf(" ", 157);
+  return text.slice(0, cut > 0 ? cut : 157) + "...";
 }
 const docUrl = (file) => `${SITE}docs/${file === "Home.md" ? "" : `${slugOf(file)}.html`}`;
 
