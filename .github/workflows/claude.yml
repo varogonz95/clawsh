@@ -12,6 +12,8 @@ name: claude
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened, assigned]
+    branches-ignore:
+      - 'release*/**'
   issue_comment:
     types: [created]
   pull_request_review_comment:
