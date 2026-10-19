@@ -5,6 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>clawsh | All your Claudes, one hub</title>
 <meta name="description" content="clawsh runs Claude Code on every machine you own and puts all the sessions in one browser tab. Start one anywhere, leave it working, step back in from wherever you are.">
+<link rel="canonical" href="https://varogonz95.github.io/clawsh/">
+<meta name="theme-color" content="#d63a26">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="clawsh">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="clawsh | All your Claudes, one hub">
+<meta property="og:description" content="clawsh runs Claude Code on every machine you own and puts all the sessions in one browser tab. Start one anywhere, leave it working, step back in from wherever you are.">
+<meta property="og:url" content="https://varogonz95.github.io/clawsh/">
+<meta property="og:image" content="https://varogonz95.github.io/clawsh/img/web-dashboard.png">
+<meta property="og:image:width" content="2560">
+<meta property="og:image:height" content="1720">
+<meta property="og:image:alt" content="The clawsh web dashboard: cards for each machine, listing its Claude Code sessions.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="clawsh | All your Claudes, one hub">
+<meta name="twitter:description" content="clawsh runs Claude Code on every machine you own and puts all the sessions in one browser tab. Start one anywhere, leave it working, step back in from wherever you are.">
+<meta name="twitter:image" content="https://varogonz95.github.io/clawsh/img/web-dashboard.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "clawsh",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Linux, macOS, Windows",
+  "description": "A cross-machine manager for Claude Code sessions: start Claude Code on any machine in your network, leave it working, and attach again from a browser tab or a terminal.",
+  "url": "https://varogonz95.github.io/clawsh/",
+  "downloadUrl": "https://github.com/varogonz95/clawsh/releases",
+  "codeRepository": "https://github.com/varogonz95/clawsh",
+  "license": "https://github.com/varogonz95/clawsh/blob/main/LICENSE",
+  "image": "https://varogonz95.github.io/clawsh/img/web-dashboard.png",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bagel+Fat+One&family=Martian+Mono:wdth,wght@87.5,400;87.5,600&display=swap" rel="stylesheet">
@@ -168,6 +201,23 @@
 .diagram .you-t { fill: var(--deep-fg); }
 .diagram .you-s { fill: var(--deep-dim); }
 .diagram .line { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1 9; }
+
+/* use cases */
+.cases { display: grid; gap: 16px; margin-top: 36px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.case { background: var(--foam); border: 1px solid var(--rule); border-radius: 14px; padding: 22px; }
+.case .n { display: block; font-family: var(--display); color: var(--shell); font-size: 1.5rem; line-height: 1; margin-bottom: 10px; }
+.case p { margin: 0; color: var(--ink-soft); }
+
+/* roadmap */
+.road { display: grid; gap: 16px; margin-top: 36px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.lane { background: var(--foam); border: 1px solid var(--rule); border-radius: 14px; padding: 22px; }
+.lane h3 { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.lane h3 span { font-family: var(--mono); font-stretch: 87.5%; font-weight: 400; font-size: .75rem; color: var(--ink-soft); }
+.lane.next { border-color: var(--shell); }
+.lane ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.lane li { color: var(--ink-soft); }
+.lane li strong { display: block; color: var(--ink); }
+.road-foot { margin-top: 20px; color: var(--ink-soft); font-size: .95rem; }
 
 /* compared */
 .compare { width: 100%; margin-top: 36px; border-collapse: collapse; }
@@ -399,6 +449,45 @@
     </div>
   </section>
 
+  <section id="cases">
+    <div class="wrap">
+      <h2>What people use it for</h2>
+      <p class="soft">Anything where Claude Code should keep running somewhere and you want an easy way back to it.</p>
+      <div class="cases">
+        <div class="case">
+          <span class="n" aria-hidden="true">1</span>
+          <h3>Start sessions on any of your machines</h3>
+          <p>Pick the machine and folder in the browser, or run <code>clawsh new desk</code>. The session starts there, on that machine's files and tools, not on the one you're typing at.</p>
+        </div>
+        <div class="case">
+          <span class="n" aria-hidden="true">2</span>
+          <h3>Manage every session in one place</h3>
+          <p>One page, or one <code>clawsh ls</code>, lists every session on every machine with its folder, age and how many people are watching. Stop the ones you're done with.</p>
+        </div>
+        <div class="case">
+          <span class="n" aria-hidden="true">3</span>
+          <h3>Leave it working, come back later</h3>
+          <p>Close the lid or the terminal and Claude carries on. Reattach to the same running session and the recent output is replayed first, so you see where it got to.</p>
+        </div>
+        <div class="case">
+          <span class="n" aria-hidden="true">4</span>
+          <h3>Run Claude where the code and hardware are</h3>
+          <p>Put the session on the workstation with the big build, the GPU or the toolchain, and drive it from a light laptop.</p>
+        </div>
+        <div class="case">
+          <span class="n" aria-hidden="true">5</span>
+          <h3>Work across Windows, Linux and macOS</h3>
+          <p>The same binary runs on all three, so a mixed set of machines looks the same from where you sit.</p>
+        </div>
+        <div class="case">
+          <span class="n" aria-hidden="true">6</span>
+          <h3>Run several projects side by side</h3>
+          <p>Keep one session per project or branch going at once, and hop between them from a tab or with <code>clawsh attach</code> instead of juggling terminal windows.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="compare">
     <div class="wrap">
       <h2>Claude Code, with and without clawsh</h2>
@@ -522,6 +611,42 @@ token = "paste-token-from-desk"</pre>
 <span class="h-laptop">laptop/3fa0c1b7</span>  frontend  running    12m
 <span class="h-studio">studio/9e27aa10</span>  docs      exited(0)  3h02m
 <span class="dim">$</span> clawsh attach desk/8158</pre>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="wrap">
+      <h2>What's next</h2>
+      <p class="soft">clawsh is young. This is the plan in rough order, with no dates. The full list and the open issues are on the <a href="docs/roadmap.html">roadmap</a>.</p>
+      <div class="road">
+        <div class="lane">
+          <h3>Working today <span>shipped</span></h3>
+          <ul>
+            <li><strong>Agent and CLI</strong>Start, list, attach to and stop sessions on any machine.</li>
+            <li><strong>Web UI</strong>Every machine and session in a browser tab, with a full terminal. This computer only for now.</li>
+            <li><strong>Claude Code plugin</strong>Starts an agent for you and lists sessions started outside clawsh. Experimental.</li>
+          </ul>
+        </div>
+        <div class="lane next">
+          <h3>Up next <span>next</span></h3>
+          <ul>
+            <li><strong>Status and alerts</strong>See which sessions are working, idle or waiting for you, and get a nudge when one needs input.</li>
+            <li><strong>Web UI over your network</strong>Open it from a phone or another computer (<a href="https://github.com/varogonz95/clawsh/issues/6">#6</a>).</li>
+            <li><strong>Edit machines from the page</strong>No more hand-written hosts file (<a href="https://github.com/varogonz95/clawsh/issues/8">#8</a>).</li>
+            <li><strong>Interactive terminal view</strong>A session list you can attach to and return from.</li>
+          </ul>
+        </div>
+        <div class="lane">
+          <h3>Later <span>planned</span></h3>
+          <ul>
+            <li><strong>Hardening</strong>Agent as a system service, auto-reconnect, and cleaner session stops on Windows.</li>
+            <li><strong>Several viewers</strong>A sensible rule for terminal size when more than one person is watching.</li>
+            <li><strong>Safer networking</strong>TLS or Tailscale support, and finding machines automatically.</li>
+            <li><strong>More</strong>Split-pane views and sessions that survive an agent restart.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="road-foot">Something missing? <a href="https://github.com/varogonz95/clawsh/issues">Open an issue</a> or start a <a href="https://github.com/varogonz95/clawsh/discussions">discussion</a>.</p>
     </div>
   </section>
 
