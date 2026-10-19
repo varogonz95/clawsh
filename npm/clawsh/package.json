@@ -2,6 +2,18 @@
   "name": "clawsh",
   "version": "0.0.0",
   "description": "All your Claudes, one shell: start, list and attach to Claude Code sessions on every machine in your LAN.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "terminal",
+    "pty",
+    "tmux",
+    "session-manager",
+    "cli",
+    "remote",
+    "lan"
+  ],
   "license": "SEE LICENSE IN LICENSE",
   "homepage": "https://varogonz95.github.io/clawsh/",
   "repository": {
