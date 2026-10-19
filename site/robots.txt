@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://varogonz95.github.io/clawsh/sitemap.xml
