@@ -9,8 +9,8 @@ name: release-cut
 #
 # The version is computed from the last stable release on main and the pull
 # requests merged since then that changed the product (paths in
-# .github/product-paths): the largest of their "release:major" /
-# "release:minor" labels picks the bump, and none of them means a patch
+# .github/product-paths): the largest of their release:major /
+# release:minor / release:patch labels picks the bump (no label: patch)
 # (pr-labels.yml labels each PR product or non-product and checks these).
 # Nothing is committed: the version lives only in the tag, so main (which only
 # takes pull requests) is never touched.

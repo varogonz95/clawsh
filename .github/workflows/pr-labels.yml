@@ -2,7 +2,8 @@ name: pr-labels
 
 # Labels every pull request "product" or "non-product" from the files it
 # changes (the paths in .github/product-paths), and checks the release labels:
-# at most one of "release:minor" / "release:major" (none means a patch).
+# a product PR should carry exactly one of release:patch / release:minor /
+# release:major (missing is a warning and counts as a patch; two fail).
 # release-cut.yml reads them to compute the next version. The product labels
 # are set here and reset on every push, so don't edit them by hand; the
 # release labels are yours to set.
@@ -41,6 +42,7 @@ jobs:
           label() { gh api "repos/$repo/labels" -f name="$1" -f color="$2" -f description="$3" >/dev/null 2>&1 || true; }
           label product d63a26 "Changes what a release ships (.github/product-paths)"
           label non-product c5def5 "Docs, site, workflows: no release needed"
+          label release:patch 0e8a16 "Next release bumps the patch version"
           label release:minor 1d76db "Next release bumps the minor version"
           label release:major 5319e7 "Next release bumps the major version"
 
@@ -59,13 +61,17 @@ jobs:
           gh api -X DELETE "repos/$repo/issues/$PR/labels/$drop" >/dev/null 2>&1 || true
           echo "### #$PR is $add" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: One release label at most
+      - name: Release label
         shell: bash
         run: |
           set -euo pipefail
-          labels=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '[.[].name | select(startswith("release:"))] | join(" ")')
+          all=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '[.[].name] | join(" ")')
+          labels=$(tr ' ' '\n' <<< "$all" | grep '^release:' | tr '\n' ' ' | sed 's/ $//' || true)
           if [[ $labels == *" "* ]]; then
-            echo "::error::Use at most one release label, not: $labels"
+            echo "::error::Use one release label, not: $labels"
             exit 1
           fi
-          echo "Release label: ${labels:-none (patch)}"
+          if [[ -z $labels && " $all " == *" product "* ]]; then
+            echo "::warning::Product PR without a release label: add release:patch, release:minor or release:major (none counts as a patch)"
+          fi
+          echo "Release label: ${labels:-none}"
