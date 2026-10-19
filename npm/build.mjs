@@ -43,7 +43,7 @@ for (const [goos, goarch, os, cpu] of targets) {
   write(path.join(dir, "package.json"), JSON.stringify({
     name,
     version,
-    description: `The clawsh binary for ${os} ${cpu}. Install "clawsh" instead; it picks this up.`,
+    description: `The clawsh binary for ${os} ${cpu}. Install "clawsh-cli" instead; it picks this up.`,
     license: main.license,
     homepage: main.homepage,
     repository: main.repository,
@@ -55,7 +55,7 @@ for (const [goos, goarch, os, cpu] of targets) {
   write(path.join(dir, "README.md"), [
     `# ${name}`,
     "",
-    `The prebuilt \`clawsh\` binary for ${os} ${cpu}. Don't install this directly: \`npm i -g clawsh\` installs it for you.`,
+    `The prebuilt \`clawsh\` binary for ${os} ${cpu}. Don't install this directly: \`npm i -g clawsh-cli\` installs it for you.`,
     "",
     "clawsh starts Claude Code sessions on any machine in your network and lets you attach to them from any terminal or browser.",
     "",
@@ -75,4 +75,4 @@ write(path.join(mainDir, "package.json"), JSON.stringify(main, null, 2) + "\n");
 fs.copyFileSync(path.join(here, "..", "README.md"), path.join(mainDir, "README.md"));
 fs.copyFileSync(license, path.join(mainDir, "LICENSE"));
 
-console.log(`staged clawsh ${version}: ${targets.length} platform packages + launcher in ${outDir}`);
+console.log(`staged ${main.name} ${version}: ${targets.length} platform packages + launcher in ${outDir}`);

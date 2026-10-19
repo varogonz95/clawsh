@@ -77,6 +77,6 @@ Replaces this binary with the latest release, verified against the release's `ch
 | `--version X` | Install exactly this version, pre-releases and downgrades included |
 | `--force` | Allow replacing a development build (refused otherwise) |
 
-Installs made with npm are refused: use `npm install -g clawsh@latest`. `CLAWSH_RELEASES_URL` points it at a mirror, as for the install scripts. If the binary's directory isn't writable, rerun the installer or use `sudo`. On Windows the old binary is renamed to `clawsh.exe.old` and removed on the next start.
+Installs made with npm are refused: use `npm install -g clawsh-cli@latest`. `CLAWSH_RELEASES_URL` points it at a mirror, as for the install scripts. If the binary's directory isn't writable, rerun the installer or use `sudo`. On Windows the old binary is renamed to `clawsh.exe.old` and removed on the next start.
 
 ### `clawsh version`, `clawsh help`
