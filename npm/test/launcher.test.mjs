@@ -112,3 +112,10 @@ test("CLAWSH_BINARY_PATH wins over everything", { skip: !unix }, async () => {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, "custom\n");
 });
+
+test("sets CLAWSH_LAUNCHER=npm for the child", { skip: !unix }, async () => {
+  const bin = path.join(tmp, "env-bin");
+  fs.writeFileSync(bin, '#!/bin/sh\necho "launcher=$CLAWSH_LAUNCHER"\n', { mode: 0o755 });
+  const r = await run([], { CLAWSH_BINARY_PATH: bin });
+  assert.equal(r.stdout, "launcher=npm\n", r.stderr);
+});

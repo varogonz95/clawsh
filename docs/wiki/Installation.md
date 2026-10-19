@@ -30,6 +30,10 @@ Run it again to upgrade. Settings:
 
 With `curl … | sh`, set them on the `sh` side: `curl -fsSL …/install.sh | CLAWSH_VERSION=0.1.0 sh`. In PowerShell, set `$env:CLAWSH_VERSION = '0.1.0'` first. To read the script before running it, open [install.sh](https://varogonz95.github.io/clawsh/install.sh) or [install.ps1](https://varogonz95.github.io/clawsh/install.ps1); the source is in `site/` in the repository.
 
+## Updating
+
+`clawsh update` replaces the binary with the latest release (`clawsh update --check` only looks); see [Commands](Commands.md#clawsh-update). With npm, run `npm install -g clawsh@latest` instead.
+
 ## npm
 
 With Node 18 or newer:

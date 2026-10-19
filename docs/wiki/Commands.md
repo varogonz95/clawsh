@@ -67,4 +67,16 @@ Alias: `rm`. Asks the process to stop, forces it after 3 s, and removes the sess
 
 Serves the browser UI on `127.0.0.1:7421` and opens it. Flags: `--listen` (loopback addresses only), `--no-open`, `--config`. See [Web UI](Web-UI.md).
 
+### `clawsh update`
+
+Replaces this binary with the latest release, verified against the release's `checksums.txt` (the same download the install scripts do). Run it on each machine; a running `clawsh agent` or `clawsh web` keeps the old version until you restart it, and sessions don't survive an agent restart, so the command warns when the local agent is older.
+
+| Flag | |
+|---|---|
+| `--check` | Only report whether a newer version exists (`clawsh <new> is available (you have <cur>)`) |
+| `--version X` | Install exactly this version, pre-releases and downgrades included |
+| `--force` | Allow replacing a development build (refused otherwise) |
+
+Installs made with npm are refused: use `npm install -g clawsh@latest`. `CLAWSH_RELEASES_URL` points it at a mirror, as for the install scripts. If the binary's directory isn't writable, rerun the installer or use `sudo`. On Windows the old binary is renamed to `clawsh.exe.old` and removed on the next start.
+
 ### `clawsh version`, `clawsh help`
