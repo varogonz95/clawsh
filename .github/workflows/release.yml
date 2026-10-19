@@ -33,14 +33,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Check plugin version
-        run: |
-          plugin=$(jq -r .version plugin/.claude-plugin/plugin.json)
-          if [[ $plugin != "${GITHUB_REF_NAME#v}" ]]; then
-            echo "::error file=plugin/.claude-plugin/plugin.json::version is $plugin, tag is $GITHUB_REF_NAME; bump it before tagging"
-            exit 1
-          fi
-
       # Where this version goes. A release on an older line (a hotfix on
       # release/0.1 after 0.2.0) must not take GitHub's "Latest", npm's latest or
       # npm's next: it gets release-<line> or next-<line> instead.

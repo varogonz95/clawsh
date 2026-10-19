@@ -3,7 +3,7 @@
 # README.md is packaged into the release archives but left out on purpose: a
 # README-only change doesn't warrant a release.
 # One git pathspec per line; a trailing / matches a directory. Read by
-# release-prepare.yml, which refuses a release with no product change. Any tool
+# release-cut.yml, which refuses a release with no product change. Any tool
 # that classifies commits the same way should read this file, not copy it.
 cmd/
 internal/

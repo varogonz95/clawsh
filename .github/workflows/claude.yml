@@ -6,8 +6,8 @@ name: claude
 # Needs the secret CLAUDE_CODE_OAUTH_TOKEN (run `claude setup-token`, then add
 # it under Settings > Secrets and variables > Actions) and the Claude GitHub
 # App installed on the repo (https://github.com/apps/claude).
-# PRs from forks get no secrets, so they aren't reviewed; nor are PRs opened
-# with GITHUB_TOKEN (the release PRs), which start no workflows.
+# PRs from forks get no secrets, so they aren't reviewed; nor are PRs into a
+# release/<x.y> hotfix branch (branches-ignore below).
 
 on:
   pull_request:
