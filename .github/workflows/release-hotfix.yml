@@ -3,16 +3,12 @@ name: release-hotfix
 # Ships chosen commits from main as a patch on top of an earlier release:
 #   gh workflow run release-hotfix.yml -f version=0.1.1 -f commits="<sha> <sha>"
 # It checks out release/<major>.<minor> (created from the newest v<major>.<minor>.*
-# tag the first time), cherry-picks the commits with -x, bumps
-# plugin/.claude-plugin/plugin.json, tags the result and pushes the branch and
-# tag together, which starts release.yml. To release main as it is, use
-# release-prepare.yml.
+# tag the first time), cherry-picks the commits with -x, tags the result and
+# pushes the branch and tag together, which starts release.yml. Like
+# release-cut.yml it commits no version: the version lives only in the tag.
+# To release main as it is, use release-cut.yml.
 #
-# The bump stays on the release branch. main's plugin.json is set by
-# release-prepare at each release, and copying an older line's version into it
-# would move it backwards.
-#
-# Needs the same RELEASE_TOKEN secret as release-prepare.yml (in the `releases`
+# Needs the same RELEASE_TOKEN secret as release-cut.yml (in the `releases`
 # environment, which this job runs in), and the token must
 # be allowed to push release/* branches. Picking a commit that changes
 # .github/workflows/ also needs the token's Workflows: read and write permission.
@@ -32,7 +28,7 @@ on:
 permissions:
   contents: read
 
-# Shared with release-prepare.yml: one release runs at a time and at most one
+# Shared with release-cut.yml: one release runs at a time and at most one
 # waits; a newer dispatch cancels the waiting one, so dispatch the next release
 # after the previous run finishes.
 concurrency:
@@ -67,7 +63,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN }}
 
-      - name: Cherry-pick, bump, tag and push
+      - name: Cherry-pick, tag and push
         run: |
           set -euo pipefail
           cp scripts/release/lib.sh "$RUNNER_TEMP/lib.sh"
@@ -85,7 +81,7 @@ jobs:
           fi
           newest=$(highest_stable "v$line.*")
           if [[ -z $newest ]]; then
-            echo "::error::No v$line.* release to patch; for a new minor line use release-prepare.yml"
+            echo "::error::No v$line.* release to patch; for a new minor line use release-cut.yml"
             exit 1
           fi
           if ! version_gt "$VERSION" "$newest"; then
@@ -112,7 +108,7 @@ jobs:
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             git fetch -q origin "$branch"
             git checkout -q -B "$branch" "origin/$branch"
-            # A later release of this line cut from main (release-prepare) isn't on
+            # A later release of this line cut from main (release-cut) isn't on
             # the branch; tagging the branch would drop what that release shipped.
             if ! git merge-base --is-ancestor "v$newest" HEAD; then
               echo "::error::$branch does not contain v$newest, the latest $line.x release, so this hotfix would drop changes that already shipped. Merge v$newest into $branch by hand, then re-run."
@@ -155,12 +151,6 @@ jobs:
             exit 1
           fi
 
-          bump_plugin "$VERSION"
-          if git diff --quiet; then
-            echo "::error::plugin.json on $branch is already at $VERSION"
-            exit 1
-          fi
-          git commit -qam "release: $tag"
           git tag -a "$tag" -m "clawsh $tag"
           git push --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$tag"
 
