@@ -4,10 +4,12 @@ name: release-tag
 # is merged into main, this tags the release, which starts release.yml.
 # The bump commit is recognized by its subject ("release: v<version>", or
 # "release: v<version> (#<pr>)" when squashed) and its Release-Base trailer.
-# It is tagged only if its parent is still that base, so the tag holds exactly
-# the chosen commit plus the bump: a merge commit always keeps that, and a
-# squash or rebase does when main hadn't moved since release-prepare ran.
-# Otherwise it is reported and nothing is tagged.
+# A merge commit keeps the bump commit on that base, so the tag holds exactly
+# the chosen commit plus the bump. A squash or rebase puts it on main as it was
+# at merge time, which (main requiring up-to-date branches) often includes
+# commits merged after release-prepare ran; it is tagged when those commits
+# change nothing under .github/product-paths, so the release still ships the
+# chosen product code. Otherwise it is reported and nothing is tagged.
 #
 # It runs on every push to main, not only ones that change plugin.json: a
 # release PR merged after main already got the version (say, after a squashed
@@ -49,6 +51,7 @@ jobs:
           # A squash merge appends " (#<pr>)" to the subject.
           release_re='^release: v([^ ]+)( \(#[0-9]+\))?$'
           releases=()
+          mapfile -t product_paths < <(grep -v '^#' .github/product-paths | grep .)
           if [[ ! $BEFORE =~ ^0+$ ]]; then
             while IFS=$'\t' read -r c subject; do
               [[ $subject =~ $release_re ]] || continue
@@ -70,11 +73,21 @@ jobs:
                 continue
               fi
               # A squash or rebase merge puts the bump on top of main as it was at
-              # merge time; if main had moved past the base, tagging it would
-              # release commits that weren't chosen.
-              if [[ $(git rev-parse "$c^1") != "$base" ]]; then
-                echo "::error::${c:0:7} ($subject) was squashed or rebased onto commits newer than the chosen ${base:0:7}, so nothing was tagged (a merge commit avoids this). main's plugin.json now has $version: delete release-bump/v$version if it's still there, then run release-prepare for $version with ref ${c:0:7} to release main as of this merge, or with no ref to release main's tip."
-                exit 1
+              # merge time. Commits merged after the base are fine as long as
+              # none of them changes the product; otherwise tagging would ship
+              # product changes that weren't chosen.
+              parent=$(git rev-parse "$c^1")
+              if [[ $parent != "$base" ]]; then
+                if ! git merge-base --is-ancestor "$base" "$parent"; then
+                  echo "::error::${c:0:7} ($subject) doesn't sit on top of the chosen ${base:0:7}, so nothing was tagged. Delete release-bump/v$version if it's still there, then run release-prepare for $version with ref ${c:0:7} to release main as of this merge, or with no ref to release main's tip."
+                  exit 1
+                fi
+                product=$(git log --format='%h %s' "$base..$parent" -- "${product_paths[@]}" ':(exclude)plugin/.claude-plugin/plugin.json')
+                if [[ -n $product ]]; then
+                  echo "::error::${c:0:7} ($subject) was squashed or rebased onto product changes merged after the chosen ${base:0:7}, so nothing was tagged (a merge commit avoids this): $(tr '\n' ';' <<< "$product") main's plugin.json now has $version: delete release-bump/v$version if it's still there, then run release-prepare for $version with ref ${c:0:7} to release main as of this merge, or with no ref to release main's tip."
+                  exit 1
+                fi
+                echo "::notice::${c:0:7} ($subject) sits on commits merged after ${base:0:7}, none of them product changes; tagging it."
               fi
               plugin=$(git show "$c:plugin/.claude-plugin/plugin.json" | jq -r .version)
               if [[ $plugin != "$version" ]]; then
