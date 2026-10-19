@@ -21,8 +21,11 @@ const REPO = "https://github.com/varogonz95/clawsh";
 const SITE = "https://varogonz95.github.io/clawsh/";
 
 // The newest stable release (highest vX.Y.Z tag), shown as the last item of
-// every page's main nav in place of <!--release-->. Needs the tags fetched (pages.yml
-// checks out with fetch-depth 0); without any, the label is left out.
+// every page's main nav in place of <!--release-->. That's the release GitHub
+// marks Latest: release.yml rebuilds the site only for those, and a hotfix on
+// an older line is never the highest tag. Needs the tags fetched (pages.yml
+// checks out with fetch-depth 0). Without any, a local build leaves the label
+// out, but CI fails, so a broken checkout can't deploy a site without it.
 function latestRelease() {
   let tags = "";
   try {
@@ -33,6 +36,10 @@ function latestRelease() {
   return versions.length ? `v${versions.at(-1).join(".")}` : "";
 }
 const release = latestRelease();
+if (!release && process.env.CI) {
+  console.error("docs build failed: no vX.Y.Z tag found for the release label (fetch the tags: fetch-depth 0)");
+  process.exit(1);
+}
 const releaseLabel = release
   ? `<a class="release" href="${REPO}/releases/tag/${release}" title="Latest release">${release}</a>`
   : "";
