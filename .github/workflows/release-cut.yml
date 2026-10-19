@@ -7,10 +7,11 @@ name: release-cut
 #   gh workflow run release-cut.yml -f bump=minor        # force the bump
 #   gh workflow run release-cut.yml -f version=0.4.0-rc.1
 #
-# The version is computed from the last stable release on main and the product
-# commits since then (paths in .github/product-paths), read as conventional
-# commits: a breaking change ("feat!:", "BREAKING CHANGE") bumps the major
-# (the minor while still on 0.x), a "feat" the minor, anything else the patch.
+# The version is computed from the last stable release on main and the pull
+# requests merged since then that changed the product (paths in
+# .github/product-paths): the largest of their "release:major" /
+# "release:minor" labels picks the bump, and none of them means a patch
+# (pr-labels.yml labels each PR product or non-product and checks these).
 # Nothing is committed: the version lives only in the tag, so main (which only
 # takes pull requests) is never touched.
 #
@@ -28,7 +29,7 @@ on:
         required: false
         type: string
       bump:
-        description: "How to bump the last release. auto: from the commit messages"
+        description: "How to bump the last release. auto: from the merged PRs' release labels"
         required: false
         default: auto
         type: choice
@@ -45,6 +46,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read # the merged PRs' release labels
 
 # Shared with release-hotfix.yml: one release runs at a time.
 concurrency:
@@ -60,6 +62,7 @@ jobs:
       VERSION: ${{ inputs.version }}
       ALLOW_NON_PRODUCT: ${{ inputs.allow_non_product }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
     defaults:
       run:
         shell: bash
@@ -108,17 +111,15 @@ jobs:
             last=${last:-0.0.0}
             if [[ $BUMP == auto ]]; then
               BUMP=patch
-              # Product commits only: a docs-only "feat" doesn't make a minor.
-              for c in ${product:-$(git rev-list "$range")}; do
-                msg=$(git log -1 --format='%s%n%b' "$c")
-                if [[ $msg =~ ^[a-z]+(\([^\)]*\))?!: || $msg == *"BREAKING CHANGE"* ]]; then
-                  BUMP=major; break
-                elif [[ $msg =~ ^feat(\([^\)]*\))?: ]]; then
-                  BUMP=minor
-                fi
+              # The largest release label among the PRs that brought product
+              # commits; a commit pushed without a PR counts as a patch.
+              for c in $product; do
+                labels=$(gh api "repos/$GITHUB_REPOSITORY/commits/$c/pulls" --jq '[.[] | select(.merged_at) | .labels[].name] | join(" ")')
+                case " $labels " in
+                  *" release:major "*) BUMP=major; break ;;
+                  *" release:minor "*) BUMP=minor ;;
+                esac
               done
-              # Before 1.0 a breaking change bumps the minor.
-              [[ $BUMP == major && ${last%%.*} == 0 ]] && BUMP=minor
             fi
             VERSION=$(next_version "$last" "$BUMP")
           fi
@@ -135,6 +136,7 @@ jobs:
             echo "::error::$VERSION is not newer than the latest release v$highest. To patch an older line, use release-hotfix.yml"
             exit 1
           fi
+          echo "Version $VERSION (previous: ${prev:-none}, bump: ${BUMP:-given})"
           echo "SHA=$sha" >> "$GITHUB_ENV"
           echo "TAG=v$VERSION" >> "$GITHUB_ENV"
           echo "PREV=${prev:-none}" >> "$GITHUB_ENV"
