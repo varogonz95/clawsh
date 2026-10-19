@@ -98,7 +98,7 @@ func runUpdate(args []string) error {
 		exe = resolved
 	}
 	if installedWithNPM(exe) {
-		return errors.New("installed with npm: run npm install -g clawsh@latest")
+		return errors.New("installed with npm: run npm install -g clawsh-cli@latest")
 	}
 	if isDevBuild() && !*force {
 		return errors.New("this is a development build (" + cur + "); use --force to replace it anyway")

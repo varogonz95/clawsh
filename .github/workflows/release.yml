@@ -130,7 +130,8 @@ jobs:
         run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
 
   # The same binaries as the GitHub release, as npm packages: one per platform
-  # (clawsh-<os>-<cpu>) plus the "clawsh" launcher that depends on them.
+  # (clawsh-<os>-<cpu>) plus the "clawsh-cli" launcher that depends on them (npm
+  # doesn't allow the name "clawsh"; the command it installs is still clawsh).
   npm:
     needs: release
     runs-on: ubuntu-latest
