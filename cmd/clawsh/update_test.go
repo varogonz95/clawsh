@@ -70,7 +70,7 @@ func TestUpdateCommand(t *testing.T) {
 		t.Fatalf("--check older: %v\n%s", err, out)
 	}
 
-	if out, err := runBin(old, append(env, "CLAWSH_LAUNCHER=npm"), "update"); err == nil || !strings.Contains(out, "installed with npm: run npm install -g clawsh@latest") {
+	if out, err := runBin(old, append(env, "CLAWSH_LAUNCHER=npm"), "update"); err == nil || !strings.Contains(out, "installed with npm: run npm install -g clawsh-cli@latest") {
 		t.Fatalf("npm: %v\n%s", err, out)
 	}
 

@@ -1,5 +1,5 @@
 {
-  "name": "clawsh",
+  "name": "clawsh-cli",
   "version": "0.0.0",
   "description": "All your Claudes, one shell: start, list and attach to Claude Code sessions on every machine in your LAN.",
   "keywords": [
