@@ -109,7 +109,7 @@ function rewrite(href, from) {
 // First paragraph of a page as plain text, for its meta description.
 function describe(html) {
   const p = html.match(/<p>([\s\S]*?)<\/p>/)?.[1] ?? "";
-  const text = p.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  const text = p.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
   return text.length > 160 ? text.slice(0, text.lastIndexOf(" ", 157)) + "..." : text;
 }
 const docUrl = (file) => `${SITE}docs/${file === "Home.md" ? "" : `${slugOf(file)}.html`}`;
