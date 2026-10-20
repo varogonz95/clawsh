@@ -1,0 +1,19 @@
+# Paths that make a commit "product": changes here alter what a release ships.
+# Anything else (docs, site pages, workflows, .claude, Markdown) is non-product.
+# README.md is packaged into the release archives but left out on purpose: a
+# README-only change doesn't warrant a release.
+# One git pathspec per line; a trailing / matches a directory. Read by
+# release-cut.yml, which refuses a release with no product change. Any tool
+# that classifies commits the same way should read this file, not copy it.
+cmd/
+internal/
+npm/
+plugin/
+.claude-plugin/
+go.mod
+go.sum
+Makefile
+Dockerfile
+LICENSE
+site/install.sh
+site/install.ps1

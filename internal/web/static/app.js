@@ -612,6 +612,7 @@ function openSession(host, id) {
   renderSessionChrome();
   term.open(v.termEl);
   fit.fit();
+  attachScrollThumb(term, v.termEl);
   term.focus();
   const enc = new TextEncoder();
   term.onData((d) => send(v, enc.encode(d)));
@@ -620,6 +621,63 @@ function openSession(host, id) {
   v.onWindowResize = () => fit.fit();
   window.addEventListener('resize', v.onWindowResize);
   connect(v);
+}
+
+// Overlay scrollbar: round, translucent, visible only while the buffer scrolls (or while hovered/dragged).
+function attachScrollThumb(term, host) {
+  const thumb = h('div', { class: 'scrollthumb' });
+  host.appendChild(thumb);
+  let hideTimer = null;
+  let dragging = false;
+  const geometry = () => {
+    const buf = term.buffer.active;
+    const total = buf.baseY + term.rows;
+    const track = host.clientHeight - 16;
+    const size = Math.max(28, track * term.rows / total);
+    return { buf, total, track, size, range: track - size };
+  };
+  const place = () => {
+    const { buf, size, range } = geometry();
+    const max = buf.baseY;
+    thumb.style.height = size + 'px';
+    thumb.style.top = 8 + (max ? range * buf.viewportY / max : range) + 'px';
+    thumb.style.display = max ? '' : 'none';
+  };
+  const poke = () => {
+    place();
+    thumb.classList.add('on');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => { if (!dragging && !thumb.matches(':hover')) thumb.classList.remove('on'); }, 1000);
+  };
+  term.onScroll(poke);
+  // The viewport's own scroll event also covers wheel/touch scrolling, which term.onScroll misses.
+  host.querySelector('.xterm-viewport').addEventListener('scroll', poke, { passive: true });
+  term.onResize(place);
+  thumb.addEventListener('pointerenter', () => { clearTimeout(hideTimer); thumb.classList.add('on'); });
+  thumb.addEventListener('pointerleave', () => { if (!dragging) poke(); });
+  thumb.addEventListener('pointerdown', (e) => {
+    const { buf, range } = geometry();
+    const startY = e.clientY, startLine = buf.viewportY;
+    dragging = true;
+    thumb.classList.add('drag');
+    thumb.setPointerCapture(e.pointerId);
+    const move = (m) => {
+      if (range > 0) term.scrollToLine(Math.round(startLine + (m.clientY - startY) * buf.baseY / range));
+    };
+    const up = () => {
+      dragging = false;
+      thumb.classList.remove('drag');
+      thumb.removeEventListener('pointermove', move);
+      thumb.removeEventListener('pointerup', up);
+      thumb.removeEventListener('pointercancel', up);
+      poke();
+    };
+    thumb.addEventListener('pointermove', move);
+    thumb.addEventListener('pointerup', up);
+    thumb.addEventListener('pointercancel', up);
+    e.preventDefault();
+  });
+  place();
 }
 
 function closeSession() {

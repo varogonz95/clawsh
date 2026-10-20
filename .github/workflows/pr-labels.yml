@@ -1,0 +1,77 @@
+name: pr-labels
+
+# Labels every pull request "product" or "non-product" from the files it
+# changes (the paths in .github/product-paths), and checks the release labels:
+# a product PR should carry exactly one of release:patch / release:minor /
+# release:major (missing is a warning and counts as a patch; two fail).
+# release-cut.yml reads them to compute the next version. The product labels
+# are set here and reset on every push, so don't edit them by hand; the
+# release labels are yours to set.
+#
+# pull_request_target, so fork PRs get labeled too: it runs with the base
+# branch's workflow and checks out the base branch only, never the PR's code.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write # labels live on the issue side of a PR
+
+concurrency:
+  group: pr-labels-${{ github.event.pull_request.number }}
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4 # the base branch: only .github/product-paths is read
+
+      - name: Product or non-product
+        if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo=$GITHUB_REPOSITORY
+          # The labels, created on first use.
+          label() { gh api "repos/$repo/labels" -f name="$1" -f color="$2" -f description="$3" >/dev/null 2>&1 || true; }
+          label product d63a26 "Changes what a release ships (.github/product-paths)"
+          label non-product c5def5 "Docs, site, workflows: no release needed"
+          label release:patch 0e8a16 "Next release bumps the patch version"
+          label release:minor 1d76db "Next release bumps the minor version"
+          label release:major 5319e7 "Next release bumps the major version"
+
+          mapfile -t paths < <(grep -v '^#' .github/product-paths | grep .)
+          product=false
+          while IFS= read -r f; do
+            for p in "${paths[@]}"; do
+              if [[ $p == */ && $f == "$p"* ]] || [[ $f == "$p" ]]; then
+                product=true; break 2
+              fi
+            done
+          done < <(gh api --paginate "repos/$repo/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
+
+          if [[ $product == true ]]; then add=product drop=non-product; else add=non-product drop=product; fi
+          gh api "repos/$repo/issues/$PR/labels" -f "labels[]=$add" >/dev/null
+          gh api -X DELETE "repos/$repo/issues/$PR/labels/$drop" >/dev/null 2>&1 || true
+          echo "### #$PR is $add" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release label
+        shell: bash
+        run: |
+          set -euo pipefail
+          all=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '[.[].name] | join(" ")')
+          labels=$(tr ' ' '\n' <<< "$all" | grep '^release:' | tr '\n' ' ' | sed 's/ $//' || true)
+          if [[ $labels == *" "* ]]; then
+            echo "::error::Use one release label, not: $labels"
+            exit 1
+          fi
+          if [[ -z $labels && " $all " == *" product "* ]]; then
+            echo "::warning::Product PR without a release label: add release:patch, release:minor or release:major (none counts as a patch)"
+          fi
+          echo "Release label: ${labels:-none}"

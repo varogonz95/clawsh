@@ -9,6 +9,7 @@
 //	clawsh attach <host>/<id>        attach; Ctrl-] detaches
 //	clawsh kill <host>/<id>
 //	clawsh web                       browser UI for every host and session
+//	clawsh update                    self-update from the latest GitHub release
 package main
 
 import (
@@ -34,6 +35,7 @@ import (
 	"github.com/varogonz95/clawsh/internal/api"
 	"github.com/varogonz95/clawsh/internal/hub"
 	"github.com/varogonz95/clawsh/internal/mcp"
+	"github.com/varogonz95/clawsh/internal/update"
 	"github.com/varogonz95/clawsh/internal/web"
 )
 
@@ -41,6 +43,9 @@ func main() {
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
+	}
+	if exe, err := os.Executable(); err == nil {
+		update.CleanupOld(exe)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
 	var err error
@@ -63,6 +68,8 @@ func main() {
 		err = runKill(args)
 	case "web":
 		err = runWeb(args)
+	case "update":
+		err = runUpdate(args)
 	case "version":
 		fmt.Println("clawsh", api.Version)
 	case "help", "-h", "--help":
@@ -97,6 +104,9 @@ hub side (run anywhere; reads hosts.toml):
   kill <host>/<id>                   stop and remove a session
   web [--listen 127.0.0.1:7421] [--no-open]
                                      open the browser UI (loopback only)
+
+update [--check] [--version X] [--force]
+                                     replace this binary with the latest release
 
 hub commands accept --config (default: `+hub.DefaultConfigPath()+`)
 `)
