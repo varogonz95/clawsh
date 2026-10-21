@@ -159,6 +159,8 @@ a.row:hover { background: var(--raised); color: inherit; }
 .session > p { margin: 0; }
 .banner { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px; border-radius: 10px; background: var(--raised); border: 1px solid var(--rule-strong); }
 .banner.config-error { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-bg); margin-bottom: 24px; overflow-wrap: anywhere; }
+.banner.updated { position: sticky; top: 0; z-index: 50; border-radius: 0; color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-bg); }
+.warn-text { color: var(--warn-ink); }
 .first-run .banner.config-error { margin-bottom: 0; }
 
 /* dialogs */
@@ -180,6 +182,13 @@ legend { padding: 0; margin-bottom: 10px; font-weight: 600; }
 .field label { font-weight: 600; }
 .input { min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--rule-strong); background: var(--ground); color: var(--ink); font: inherit; }
 .input.mono { font: 14px var(--mono); }
+.recent { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.recent[hidden] { display: none; }
+.recent-item { max-width: 100%; min-height: 32px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 8px; background: transparent; color: var(--ink-2); font: 13px var(--mono); cursor: pointer; text-align: left; display: flex; }
+.recent-item:hover { border-color: var(--accent); color: var(--ink); }
+/* Long paths: keep the end, ellipsis at the start. */
+.recent-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; unicode-bidi: plaintext; }
+.recent-toggle { background: none; border: 0; padding: 4px 0; color: var(--ink-2); text-decoration: underline; cursor: pointer; font: inherit; }
 details { border-top: 1px solid var(--rule); padding-top: 16px; }
 summary { cursor: pointer; font-weight: 600; color: var(--ink-2); min-height: 32px; }
 details .field { margin-top: 12px; }

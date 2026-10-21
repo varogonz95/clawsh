@@ -48,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /v1/sessions", s.auth(s.create))
 	mux.Handle("DELETE /v1/sessions/{id}", s.auth(s.remove))
 	mux.Handle("GET /v1/sessions/{id}/attach", s.auth(s.attach))
+	mux.Handle("GET /v1/dirs/recent", s.auth(s.recentDirs))
 	mux.Handle("GET /v1/external", s.auth(s.listExternal))
 	mux.Handle("PUT /v1/external/{id}", s.auth(s.announce))
 	mux.Handle("DELETE /v1/external/{id}", s.auth(s.withdraw))
@@ -72,6 +73,10 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) list(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.m.List())
+}
+
+func (s *Server) recentDirs(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, api.RecentDirs{Dirs: s.m.RecentDirs()})
 }
 
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
