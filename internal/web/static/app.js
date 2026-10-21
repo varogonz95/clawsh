@@ -91,6 +91,7 @@ const state = {
   live: 'connecting',   // connecting | live | reconnecting | signed-out
   view: null,           // the open session, see openSession
   dismissing: new Set(), // "host/id" of exited sessions being dismissed
+  lastSessions: new Map(), // host name -> sessions from its last online overview, so Duplicate still works once it drops offline
 };
 let newDialog = null;
 let hostDialog = null;
@@ -209,6 +210,7 @@ function connectEvents() {
   const es = new EventSource(`/api/events?k=${encodeURIComponent(KEY)}`);
   es.addEventListener('overview', (e) => {
     state.overview = JSON.parse(e.data);
+    for (const x of state.overview.hosts) if (x.online) state.lastSessions.set(x.name, x.sessions); // offline hosts report none
     checkVersion(state.overview);
     state.live = 'live';
     render();
@@ -530,7 +532,7 @@ function syncNewDialog(r) {
     if (r.name === 'new') openNewDialog({ host: r.host });
     else {
       const host = state.overview.hosts.find((x) => x.name === r.host);
-      const src = host && host.online ? host.sessions.find((x) => x.id === r.id) : null;
+      const src = host ? (host.online ? host.sessions : state.lastSessions.get(r.host) || []).find((x) => x.id === r.id) : null;
       if (!src) { toast('That session is no longer listed'); go('#/'); return; }
       openNewDialog({ host: r.host, dir: src.dir, name: src.name, args: src.args, title: `Duplicate ${sessionLabel(src)}` });
     }
