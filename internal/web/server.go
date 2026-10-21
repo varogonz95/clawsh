@@ -6,7 +6,9 @@
 package web
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"html"
@@ -110,14 +112,17 @@ func versionedIndex(b []byte, version string) []byte {
 }
 
 // cacheStatic makes browsers revalidate static files. The embed FS has no
-// modtime, so the ETag is the version plus the path.
+// modtime, so the ETag is a hash of the file's content: two builds with the
+// same version string but different files never share one.
 func (s *Server) cacheStatic(files fs.FS, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, err := fs.Stat(files, strings.TrimPrefix(r.URL.Path, "/")); err != nil {
+		b, err := fs.ReadFile(files, strings.TrimPrefix(r.URL.Path, "/"))
+		if err != nil {
 			next.ServeHTTP(w, r) // let the file server answer 404
 			return
 		}
-		etag := `"` + api.Version + `:` + r.URL.Path + `"`
+		sum := sha256.Sum256(b)
+		etag := `"` + hex.EncodeToString(sum[:8]) + `"`
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("ETag", etag)
 		if r.Header.Get("If-None-Match") == etag {

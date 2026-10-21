@@ -111,7 +111,7 @@ func TestStaticRevalidates(t *testing.T) {
 func TestStaticMissingIs404(t *testing.T) {
 	_, base := startServer(t, noHosts(t))
 	req, _ := http.NewRequest(http.MethodGet, base+"/static/nope.js", nil)
-	req.Header.Set("If-None-Match", `"`+api.Version+`:/nope.js"`)
+	req.Header.Set("If-None-Match", `"anything"`)
 	resp, err := login(t, base).Do(req)
 	if err != nil {
 		t.Fatal(err)
