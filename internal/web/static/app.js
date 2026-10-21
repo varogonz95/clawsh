@@ -755,7 +755,14 @@ function openSession(host, id) {
   term.focus();
   const enc = new TextEncoder();
   // xterm sends \r for Shift+Enter too; Claude Code reads ESC+CR as "newline".
+  // xterm keeps one custom key handler, so session switching and Shift+Enter share it.
   term.attachCustomKeyEventHandler((ev) => {
+    const step = switchKey(ev);
+    if (step) {
+      ev.preventDefault();
+      switchSession(v, step);
+      return false;
+    }
     if (!clawshKeys.isShiftEnter(ev)) return true;
     // Send on keydown only, but swallow keypress/keyup too: xterm sends \r
     // from keypress when keydown was not marked handled.
@@ -763,13 +770,6 @@ function openSession(host, id) {
     return false;
   });
   term.onData((d) => send(v, enc.encode(d)));
-  term.attachCustomKeyEventHandler((ev) => {
-    const step = switchKey(ev);
-    if (!step) return true;
-    ev.preventDefault();
-    switchSession(v, step);
-    return false;
-  });
   term.onBinary((d) => send(v, Uint8Array.from(d, (c) => c.charCodeAt(0))));
   term.onResize(({ cols, rows }) => sendResize(v, cols, rows));
   v.onWindowResize = () => fit.fit();
