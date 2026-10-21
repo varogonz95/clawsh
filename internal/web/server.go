@@ -112,17 +112,28 @@ func versionedIndex(b []byte, version string) []byte {
 }
 
 // cacheStatic makes browsers revalidate static files. The embed FS has no
-// modtime, so the ETag is a hash of the file's content: two builds with the
-// same version string but different files never share one.
+// modtime, so each file's ETag is the version plus a hash of its content,
+// computed once here: dev builds that share a version string still get a
+// new ETag when a file changes. Paths with no ETag (missing files,
+// directories) go straight to the file server.
 func (s *Server) cacheStatic(files fs.FS, next http.Handler) http.Handler {
+	etags := map[string]string{}
+	_ = fs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if b, err := fs.ReadFile(files, p); err == nil {
+			sum := sha256.Sum256(b)
+			etags[p] = `"` + api.Version + `:` + hex.EncodeToString(sum[:8]) + `"`
+		}
+		return nil
+	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, err := fs.ReadFile(files, strings.TrimPrefix(r.URL.Path, "/"))
-		if err != nil {
+		etag, ok := etags[strings.TrimPrefix(r.URL.Path, "/")]
+		if !ok {
 			next.ServeHTTP(w, r) // let the file server answer 404
 			return
 		}
-		sum := sha256.Sum256(b)
-		etag := `"` + hex.EncodeToString(sum[:8]) + `"`
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("ETag", etag)
 		if r.Header.Get("If-None-Match") == etag {

@@ -5,10 +5,12 @@ package web
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/varogonz95/clawsh/internal/api"
 )
@@ -111,7 +113,7 @@ func TestStaticRevalidates(t *testing.T) {
 func TestStaticMissingIs404(t *testing.T) {
 	_, base := startServer(t, noHosts(t))
 	req, _ := http.NewRequest(http.MethodGet, base+"/static/nope.js", nil)
-	req.Header.Set("If-None-Match", `"anything"`)
+	req.Header.Set("If-None-Match", `"`+api.Version+`:/nope.js"`)
 	resp, err := login(t, base).Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -119,5 +121,38 @@ func TestStaticMissingIs404(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound || resp.Header.Get("ETag") != "" {
 		t.Errorf("status %s, ETag %q", resp.Status, resp.Header.Get("ETag"))
+	}
+}
+
+func TestStaticETagFollowsContent(t *testing.T) {
+	etag := func(content string) string {
+		files := fstest.MapFS{"app.js": {Data: []byte(content)}}
+		h := (&Server{}).cacheStatic(files, http.FileServerFS(files))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/app.js", nil))
+		return rec.Header().Get("ETag")
+	}
+	a, b := etag("one"), etag("two")
+	if a == "" || a == b {
+		t.Errorf("ETags %q and %q: same version, different content must differ", a, b)
+	}
+	if a != etag("one") {
+		t.Error("ETag not stable for the same content")
+	}
+}
+
+// The duplicate-session route and its helpers must ship in app.js.
+func TestAppHasDuplicate(t *testing.T) {
+	_, base := startServer(t, noHosts(t))
+	resp, err := login(t, base).Get(base + "/static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	for _, want := range []string{"'dup'", "nextName", "joinArgs", "splitArgs"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("app.js lacks %s", want)
+		}
 	}
 }

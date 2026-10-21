@@ -81,6 +81,7 @@ const ICONS = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>',
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
 
@@ -90,6 +91,7 @@ const state = {
   live: 'connecting',   // connecting | live | reconnecting | signed-out
   view: null,           // the open session, see openSession
   dismissing: new Set(), // "host/id" of exited sessions being dismissed
+  lastSessions: new Map(), // host name -> sessions from its last online overview, so Duplicate still works once it drops offline
 };
 let newDialog = null;
 let hostDialog = null;
@@ -208,6 +210,7 @@ function connectEvents() {
   const es = new EventSource(`/api/events?k=${encodeURIComponent(KEY)}`);
   es.addEventListener('overview', (e) => {
     state.overview = JSON.parse(e.data);
+    for (const x of state.overview.hosts) if (x.online) state.lastSessions.set(x.name, x.sessions); // offline hosts report none
     checkVersion(state.overview);
     state.live = 'live';
     render();
@@ -231,6 +234,7 @@ function parseRoute() {
   }
   if (parts[0] === 's' && parts.length === 3) return { name: 'session', host: parts[1], id: parts[2] };
   if (parts[0] === 'hosts') return { name: 'hosts' };
+  if (parts[0] === 'dup' && parts.length === 3) return { name: 'dup', host: parts[1], id: parts[2] };
   if (parts[0] === 'new') return { name: 'new', host: parts[1] || null };
   return { name: 'home' };
 }
@@ -317,6 +321,13 @@ function hostCard(host) {
       h('a', { class: 'link', href: `#/new/${encodeURIComponent(host.name)}`, 'data-key': `new:${host.name}` }, icon('plus'), `New session on ${host.name}`)));
 }
 
+function dupButton(hostName, s) {
+  return h('button', {
+    class: 'btn ghost small icon-btn', type: 'button', 'aria-label': `Duplicate ${sessionLabel(s)}`, title: 'Duplicate',
+    'data-key': `dup:${hostName}/${s.id}`, onclick: () => go(`#/dup/${encodeURIComponent(hostName)}/${encodeURIComponent(s.id)}`),
+  }, icon('copy'));
+}
+
 function olderPill(host) {
   const ov = state.overview;
   if (!ov || !hostOlder(host, ov.version)) return null;
@@ -331,18 +342,22 @@ function sessionRow(hostName, s) {
       h('span', { class: 'grow' },
         h('span', { class: 'row-title muted' }, label),
         h('span', { class: 'mono small muted' }, `Exited · code ${s.exit_code}`)),
+      dupButton(hostName, s),
       h('button', {
         class: 'btn ghost small', type: 'button', 'data-key': `dismiss:${hostName}/${s.id}`,
         disabled: state.dismissing.has(`${hostName}/${s.id}`), onclick: () => dismiss(hostName, s),
       }, 'Dismiss'));
   }
-  return h('a', { class: 'row', href: `#/s/${encodeURIComponent(hostName)}/${encodeURIComponent(s.id)}`, 'data-key': `row:${hostName}/${s.id}` },
-    h('span', { class: 'dot ok' }),
-    h('span', { class: 'grow' },
-      h('span', { class: 'row-title' }, label),
-      h('span', { class: 'mono small muted' }, s.dir)),
-    s.viewers > 0 ? h('span', { class: 'viewers small muted' }, icon('eye', 'viewers'), String(s.viewers)) : null,
-    h('span', { class: 'mono small age' }, shortAge(s.created)));
+  // The button is a sibling of the link, never nested in it.
+  return h('div', { class: 'row split' },
+    h('a', { class: 'row-link', href: `#/s/${encodeURIComponent(hostName)}/${encodeURIComponent(s.id)}`, 'data-key': `row:${hostName}/${s.id}` },
+      h('span', { class: 'dot ok' }),
+      h('span', { class: 'grow' },
+        h('span', { class: 'row-title' }, label),
+        h('span', { class: 'mono small muted' }, s.dir)),
+      s.viewers > 0 ? h('span', { class: 'viewers small muted' }, icon('eye', 'viewers'), String(s.viewers)) : null,
+      h('span', { class: 'mono small age' }, shortAge(s.created))),
+    dupButton(hostName, s));
 }
 
 async function dismiss(hostName, s) {
@@ -512,17 +527,69 @@ function openHostDialog(existing) {
 // ---------- new session ----------
 
 function syncNewDialog(r) {
-  if (r.name === 'new' && !newDialog && state.overview) openNewDialog(r.host);
-  if (r.name !== 'new' && newDialog) newDialog.close();
+  const open = r.name === 'new' || r.name === 'dup';
+  if (open && !newDialog && state.overview) {
+    if (r.name === 'new') openNewDialog({ host: r.host });
+    else {
+      const host = state.overview.hosts.find((x) => x.name === r.host);
+      const src = host ? (host.online ? host.sessions : state.lastSessions.get(r.host) || []).find((x) => x.id === r.id) : null;
+      if (!src) { toast('That session is no longer listed'); go('#/'); return; }
+      openNewDialog({ host: r.host, dir: src.dir, name: src.name, args: src.args, title: `Duplicate ${sessionLabel(src)}` });
+    }
+  }
+  if (!open && newDialog) newDialog.close();
 }
 
-function openNewDialog(preselect) {
+// joinArgs renders args as one editable line; splitArgs is its inverse.
+function joinArgs(args) {
+  return (args || []).map((a) => (/[\s"\\]/.test(a) || a === '' ? `"${a.replace(/["\\]/g, '\\$&')}"` : a)).join(' ');
+}
+
+function splitArgs(text) {
+  const out = [];
+  let cur = '', has = false, quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '\\' && i + 1 < text.length && (text[i + 1] === '"' || text[i + 1] === '\\')) cur += text[++i];
+      else if (c === '"') quoted = false;
+      else cur += c;
+    } else if (c === '"') { quoted = true; has = true; }
+    else if (/\s/.test(c)) { if (has || cur) out.push(cur); cur = ''; has = false; }
+    else { cur += c; has = true; }
+  }
+  if (quoted) throw new Error('Unclosed quote in the arguments.');
+  if (has || cur) out.push(cur);
+  return out;
+}
+
+// nextName proposes a name for a copy of a session called name on hostName:
+// the base name if free, else base (2), base (3), ...
+function nextName(name, hostName) {
+  if (!name) return '';
+  const base = name.replace(/ \(\d+\)$/, '');
+  const host = state.overview && state.overview.hosts.find((x) => x.name === hostName);
+  const taken = new Set((host ? host.sessions : []).filter((x) => x.status !== 'exited').map((x) => x.name));
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) if (!taken.has(`${base} (${n})`)) return `${base} (${n})`;
+}
+
+function openNewDialog(opts) {
+  const { host: preselect, dir = '', name = '', args = [], title } = opts;
   const hosts = state.overview.hosts;
   const chosen = hosts.find((x) => x.name === preselect && x.online) || hosts.find((x) => x.online);
+  const offlineNote = preselect && title && chosen && chosen.name !== preselect ? `${preselect} is offline; pick another machine.` : '';
   const err = h('p', { class: 'form-error', role: 'alert' });
   const dirHelp = h('span', { class: 'small muted' });
-  const setHelp = (name) => { dirHelp.textContent = `A folder on ${name}. Leave it empty to use the home folder.`; };
+  const setHelp = (n) => { dirHelp.textContent = `A folder on ${n}. Leave it empty to use the home folder.`; };
   const submit = h('button', { class: 'btn primary', type: 'submit' }, 'Start session');
+  const nameInput = h('input', { id: 'ns-name', name: 'name', class: 'input', placeholder: 'e.g. api-refactor', autocomplete: 'off', value: title && chosen ? nextName(name, chosen.name) : '' });
+  let nameEdited = false;
+  nameInput.addEventListener('input', () => { nameEdited = true; });
+  const onHost = (n) => {
+    pick(n);
+    if (title && !nameEdited) nameInput.value = nextName(name, n);
+  };
   const recent = h('div', { class: 'recent', hidden: true });
   let recentSeq = 0;
   // loadRecent shows the machine's recent folders; any failure just hides the list.
@@ -536,38 +603,40 @@ function openNewDialog(preselect) {
     if (seq !== recentSeq || !newDialog) return;
     renderRecent(recent, dirs, document.getElementById('ns-dir'));
   };
-  const pick = (name) => { setHelp(name); loadRecent(name); };
+  const pick = (n) => { setHelp(n); loadRecent(n); };
 
   const form = h('form', { class: 'dialog-body', onsubmit: (e) => { e.preventDefault(); submitNew(form, err, submit); } },
     h('div', {},
-      h('h2', {}, 'Start a Claude session'),
+      h('h2', {}, title || 'Start a Claude session'),
       h('p', { class: 'muted' }, 'Claude starts on the machine you pick and keeps running after you close the browser.')),
     h('fieldset', {}, h('legend', {}, 'Machine'),
       h('div', { class: 'machines' }, hosts.map((x) => h('label', { class: x.online ? 'machine' : 'machine disabled' },
-        h('input', { type: 'radio', name: 'host', value: x.name, checked: chosen && x.name === chosen.name, disabled: !x.online, onchange: () => pick(x.name) }),
+        h('input', { type: 'radio', name: 'host', value: x.name, checked: chosen && x.name === chosen.name, disabled: !x.online, onchange: () => onHost(x.name) }),
         h('span', { class: 'machine-name' }, x.name),
-        x.online ? null : h('span', { class: 'small' }, '· offline'))))),
+        x.online ? null : h('span', { class: 'small' }, '· offline')))),
+      offlineNote ? h('p', { class: 'small muted' }, offlineNote) : null),
     h('div', { class: 'field' },
       h('label', { for: 'ns-dir' }, 'Folder'),
-      h('input', { id: 'ns-dir', name: 'dir', class: 'input mono', placeholder: '~', autocomplete: 'off' }),
+      h('input', { id: 'ns-dir', name: 'dir', class: 'input mono', placeholder: '~', autocomplete: 'off', value: dir }),
       dirHelp, recent),
     h('div', { class: 'field' },
       h('label', { for: 'ns-name' }, 'Name ', h('span', { class: 'muted' }, '(optional)')),
-      h('input', { id: 'ns-name', name: 'name', class: 'input', placeholder: 'e.g. api-refactor', autocomplete: 'off' })),
-    h('details', {}, h('summary', {}, 'Advanced'),
+      nameInput),
+    h('details', { open: args.length > 0 }, h('summary', {}, 'Advanced'),
       h('div', { class: 'field' },
         h('label', { for: 'ns-args' }, 'Extra Claude arguments'),
-        h('input', { id: 'ns-args', name: 'args', class: 'input mono', placeholder: '--resume', autocomplete: 'off' }))),
+        h('input', { id: 'ns-args', name: 'args', class: 'input mono', placeholder: '--resume', autocomplete: 'off', value: joinArgs(args) }))),
     err,
     h('div', { class: 'actions' },
       h('button', { class: 'btn ghost', type: 'button', onclick: () => newDialog.close() }, 'Cancel'),
       submit));
 
-  newDialog = h('dialog', { class: 'dialog', 'aria-label': 'Start a Claude session' }, form);
+  newDialog = h('dialog', { class: 'dialog', 'aria-label': title || 'Start a Claude session' }, form);
   newDialog.addEventListener('close', () => {
     newDialog.remove();
     newDialog = null;
-    if (parseRoute().name === 'new') go('#/');
+    const n = parseRoute().name;
+    if (n === 'new' || n === 'dup') go('#/');
   });
   document.body.append(newDialog);
   if (chosen) pick(chosen.name);
@@ -614,7 +683,8 @@ async function submitNew(form, err, submit) {
   const host = data.get('host');
   if (!host) { err.textContent = 'Pick a machine.'; return; }
   const text = (k) => String(data.get(k) || '').trim();
-  const args = text('args').split(/\s+/).filter(Boolean);
+  let args;
+  try { args = splitArgs(text('args')); } catch (e) { err.textContent = e.message; return; }
   const size = estimateTermSize();
   submit.disabled = true;
   err.textContent = '';
