@@ -463,6 +463,20 @@ function openNewDialog(preselect) {
   const dirHelp = h('span', { class: 'small muted' });
   const setHelp = (name) => { dirHelp.textContent = `A folder on ${name}. Leave it empty to use the home folder.`; };
   const submit = h('button', { class: 'btn primary', type: 'submit' }, 'Start session');
+  const recent = h('div', { class: 'recent', hidden: true });
+  let recentSeq = 0;
+  // loadRecent shows the machine's recent folders; any failure just hides the list.
+  const loadRecent = async (name) => {
+    const seq = ++recentSeq;
+    recent.hidden = true;
+    let dirs = [];
+    try {
+      dirs = (await api('GET', `/api/hosts/${encodeURIComponent(name)}/dirs/recent`)).dirs || [];
+    } catch (e) { /* the folder field still works */ }
+    if (seq !== recentSeq || !newDialog) return;
+    renderRecent(recent, dirs, document.getElementById('ns-dir'));
+  };
+  const pick = (name) => { setHelp(name); loadRecent(name); };
 
   const form = h('form', { class: 'dialog-body', onsubmit: (e) => { e.preventDefault(); submitNew(form, err, submit); } },
     h('div', {},
@@ -470,13 +484,13 @@ function openNewDialog(preselect) {
       h('p', { class: 'muted' }, 'Claude starts on the machine you pick and keeps running after you close the browser.')),
     h('fieldset', {}, h('legend', {}, 'Machine'),
       h('div', { class: 'machines' }, hosts.map((x) => h('label', { class: x.online ? 'machine' : 'machine disabled' },
-        h('input', { type: 'radio', name: 'host', value: x.name, checked: chosen && x.name === chosen.name, disabled: !x.online, onchange: () => setHelp(x.name) }),
+        h('input', { type: 'radio', name: 'host', value: x.name, checked: chosen && x.name === chosen.name, disabled: !x.online, onchange: () => pick(x.name) }),
         h('span', { class: 'machine-name' }, x.name),
         x.online ? null : h('span', { class: 'small' }, '· offline'))))),
     h('div', { class: 'field' },
       h('label', { for: 'ns-dir' }, 'Folder'),
       h('input', { id: 'ns-dir', name: 'dir', class: 'input mono', placeholder: '~', autocomplete: 'off' }),
-      dirHelp),
+      dirHelp, recent),
     h('div', { class: 'field' },
       h('label', { for: 'ns-name' }, 'Name ', h('span', { class: 'muted' }, '(optional)')),
       h('input', { id: 'ns-name', name: 'name', class: 'input', placeholder: 'e.g. api-refactor', autocomplete: 'off' })),
@@ -496,9 +510,35 @@ function openNewDialog(preselect) {
     if (parseRoute().name === 'new') go('#/');
   });
   document.body.append(newDialog);
-  if (chosen) setHelp(chosen.name);
+  if (chosen) pick(chosen.name);
   else { submit.disabled = true; err.textContent = 'No machine is online right now.'; }
   newDialog.showModal();
+}
+
+const RECENT_SHOWN = 3;
+
+// renderRecent fills the recent-folders list; clicking an entry fills the
+// folder field without submitting.
+function renderRecent(box, dirs, input) {
+  if (!dirs.length) { box.hidden = true; box.replaceChildren(); return; }
+  let all = false;
+  const draw = () => {
+    const shown = all ? dirs : dirs.slice(0, RECENT_SHOWN);
+    const kids = [h('span', { class: 'small muted' }, 'Recent'),
+      ...shown.map((d) => h('button', {
+        type: 'button', class: 'recent-item mono', title: d,
+        onclick: () => { input.value = d; input.focus(); },
+      }, h('span', {}, d)))];
+    if (dirs.length > RECENT_SHOWN) {
+      kids.push(h('button', {
+        type: 'button', class: 'recent-toggle small',
+        onclick: () => { all = !all; draw(); },
+      }, all ? 'Show less' : `Show all (${dirs.length})`));
+    }
+    box.replaceChildren(...kids);
+  };
+  draw();
+  box.hidden = false;
 }
 
 // estimateTermSize guesses the session page's terminal size so claude starts

@@ -131,7 +131,7 @@ func runAgent(args []string) error {
 		log.Printf("add it to hosts.toml on your hub machine:  token = %q", token)
 	}
 
-	m := agent.NewManager(agent.Options{Command: *claude, Scrollback: *scrollback})
+	m := agent.NewManager(agent.Options{Command: *claude, Scrollback: *scrollback, HistoryFile: agent.DefaultHistoryPath()})
 	srv := &http.Server{
 		Addr:              *listen,
 		Handler:           agent.NewServer(m, token).Handler(),
