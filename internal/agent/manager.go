@@ -30,6 +30,9 @@ type Options struct {
 	// ExternalTTL is how long an announced external session survives
 	// without renewal (default DefaultExternalTTL).
 	ExternalTTL time.Duration
+	// HistoryFile is where the folders of started sessions are remembered
+	// (see DefaultHistoryPath). Empty disables the history.
+	HistoryFile string
 }
 
 type Manager struct {
@@ -37,6 +40,7 @@ type Manager struct {
 	mu       sync.RWMutex
 	sessions map[string]*Session
 	ext      *externals
+	history  *dirHistory
 }
 
 func NewManager(o Options) *Manager {
@@ -46,7 +50,7 @@ func NewManager(o Options) *Manager {
 	if o.Scrollback <= 0 {
 		o.Scrollback = 2 << 20
 	}
-	return &Manager{opts: o, sessions: map[string]*Session{}, ext: newExternals(o.ExternalTTL)}
+	return &Manager{opts: o, sessions: map[string]*Session{}, ext: newExternals(o.ExternalTTL), history: &dirHistory{path: o.HistoryFile}}
 }
 
 func (m *Manager) Create(req api.CreateRequest) (*Session, error) {
@@ -81,8 +85,13 @@ func (m *Manager) Create(req api.CreateRequest) (*Session, error) {
 	m.mu.Lock()
 	m.sessions[id] = s
 	m.mu.Unlock()
+	m.history.record(dir)
 	return s, nil
 }
+
+// RecentDirs lists the folders sessions were started in, most recent first,
+// leaving out folders that no longer exist.
+func (m *Manager) RecentDirs() []string { return m.history.recent() }
 
 // Get resolves a full id or a unique id prefix.
 func (m *Manager) Get(id string) (*Session, error) {

@@ -24,19 +24,43 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      npm_tag: ${{ steps.channel.outputs.npm_tag }}
+      latest: ${{ steps.channel.outputs.latest }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      - name: Check plugin version
+      # Where this version goes. A release on an older line (a hotfix on
+      # release/0.1 after 0.2.0) must not take GitHub's "Latest", npm's latest or
+      # npm's next: it gets release-<line> or next-<line> instead.
+      - name: Channel
+        id: channel
         run: |
-          plugin=$(jq -r .version plugin/.claude-plugin/plugin.json)
-          if [[ $plugin != "${GITHUB_REF_NAME#v}" ]]; then
-            echo "::error file=plugin/.claude-plugin/plugin.json::version is $plugin, tag is $GITHUB_REF_NAME; bump it before tagging"
-            exit 1
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          core="${version%%-*}"
+          line=$(echo "$core" | cut -d. -f1,2)
+          # Stable tags only, compared on major.minor.patch, so sort -V's
+          # non-semver ordering of pre-release suffixes never matters.
+          tags=$(git ls-remote --tags --refs origin 'v*')
+          highest=$(sed 's|.*refs/tags/v||' <<< "$tags" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          newest=true
+          if [[ -n $highest && $(printf '%s\n%s\n' "$core" "$highest" | sort -V | tail -1) != "$core" ]]; then
+            newest=false
           fi
+          if [[ $version == *-* ]]; then
+            latest=false
+            npm_tag=next; [[ $newest == true ]] || npm_tag="next-$line"
+          else
+            latest=$newest
+            npm_tag=latest; [[ $newest == true ]] || npm_tag="release-$line"
+          fi
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"
+          echo "GitHub Latest: $latest, npm dist-tag: $npm_tag (highest stable release: ${highest:-none})"
 
       - name: Build
         run: make dist VERSION="${GITHUB_REF_NAME#v}"
@@ -48,7 +72,7 @@ jobs:
           if-no-files-found: error
 
       # One archive per platform, each unpacking into its own directory:
-      # clawsh_<version>_<os>_<arch>/{clawsh[.exe],README.md}
+      # clawsh_<version>_<os>_<arch>/{clawsh[.exe],README.md,LICENSE}
       - name: Package
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -62,7 +86,7 @@ jobs:
             ext=; [[ $f == *.exe ]] && ext=.exe
             mkdir "$work/$name"
             install -m 755 "$f" "$work/$name/clawsh$ext"
-            cp README.md "$work/$name/"
+            cp README.md LICENSE "$work/$name/"
             if [[ $ext == .exe ]]; then
               (cd "$work" && zip -qr "$OLDPWD/out/$name.zip" "$name")
             else
@@ -77,18 +101,37 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.channel.outputs.latest }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" out/* --clobber
+            if [[ $LATEST == false ]]; then
+              gh release edit "$GITHUB_REF_NAME" --latest=false
+            fi
             exit 0
           fi
           flags=()
           [[ $GITHUB_REF_NAME == *-* ]] && flags+=(--prerelease)
+          [[ $LATEST == false ]] && flags+=(--latest=false)
           gh release create "$GITHUB_REF_NAME" out/* \
             --verify-tag --generate-notes --title "clawsh ${GITHUB_REF_NAME}" "${flags[@]}"
 
+  # The site's header shows the newest release, so rebuild it from main. A
+  # workflow_dispatch is one of the events GITHUB_TOKEN may start.
+  site:
+    needs: release
+    if: needs.release.outputs.latest == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+
   # The same binaries as the GitHub release, as npm packages: one per platform
-  # (clawsh-<os>-<cpu>) plus the "clawsh" launcher that depends on them.
+  # (clawsh-<os>-<cpu>) plus the "clawsh-cli" launcher that depends on them (npm
+  # doesn't allow the name "clawsh"; the command it installs is still clawsh).
   npm:
     needs: release
     runs-on: ubuntu-latest
@@ -112,14 +155,16 @@ jobs:
       # Platform packages first, so the launcher never points at a missing one.
       # Versions already on npm are skipped, so a re-run finishes the job.
       - name: Publish
+        env:
+          NPM_TAG: ${{ needs.release.outputs.npm_tag }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          tag=latest; [[ $version == *-* ]] && tag=next
+          : "${NPM_TAG:?no dist-tag from the release job}"
           for dir in out/npm/clawsh-*/ out/npm/clawsh/; do
             name=$(jq -r .name "$dir/package.json")
             if npm view "$name@$version" version >/dev/null 2>&1; then
               echo "$name@$version is already published, skipping"
               continue
             fi
-            npm publish "$dir" --access public --tag "$tag"
+            npm publish "$dir" --access public --tag "$NPM_TAG"
           done

@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -48,9 +49,11 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /v1/sessions", s.auth(s.create))
 	mux.Handle("DELETE /v1/sessions/{id}", s.auth(s.remove))
 	mux.Handle("GET /v1/sessions/{id}/attach", s.auth(s.attach))
+	mux.Handle("GET /v1/dirs/recent", s.auth(s.recentDirs))
 	mux.Handle("GET /v1/external", s.auth(s.listExternal))
 	mux.Handle("PUT /v1/external/{id}", s.auth(s.announce))
 	mux.Handle("DELETE /v1/external/{id}", s.auth(s.withdraw))
+	mux.Handle("POST /v1/hooks", s.auth(s.hook))
 	return mux
 }
 
@@ -72,6 +75,10 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) list(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.m.List())
+}
+
+func (s *Server) recentDirs(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, api.RecentDirs{Dirs: s.m.RecentDirs()})
 }
 
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
@@ -121,6 +128,21 @@ func (s *Server) withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("external session %s withdrawn", r.PathValue("id"))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
+	var ev api.HookEvent
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&ev); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	sess, err := s.m.Get(ev.ClawshSessionID)
+	if ev.ClawshSessionID == "" || err != nil {
+		w.WriteHeader(http.StatusAccepted) // not a managed session: ignored
+		return
+	}
+	sess.ApplyHook(ev)
 	w.WriteHeader(http.StatusNoContent)
 }
 

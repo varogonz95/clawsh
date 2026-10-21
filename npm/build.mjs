@@ -24,6 +24,7 @@ const targets = [
 ];
 
 const main = JSON.parse(fs.readFileSync(path.join(here, "clawsh", "package.json"), "utf8"));
+const license = path.join(here, "..", "LICENSE");
 const write = (file, data) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, data);
@@ -42,7 +43,8 @@ for (const [goos, goarch, os, cpu] of targets) {
   write(path.join(dir, "package.json"), JSON.stringify({
     name,
     version,
-    description: `The clawsh binary for ${os} ${cpu}. Install "clawsh" instead; it picks this up.`,
+    description: `The clawsh binary for ${os} ${cpu}. Install "clawsh-cli" instead; it picks this up.`,
+    license: main.license,
     homepage: main.homepage,
     repository: main.repository,
     os: [os],
@@ -50,7 +52,19 @@ for (const [goos, goarch, os, cpu] of targets) {
     files: ["bin"],
     preferUnplugged: true,
   }, null, 2) + "\n");
-  write(path.join(dir, "README.md"), `# ${name}\n\nThe \`clawsh\` binary for ${os} ${cpu}. Don't install this directly: \`npm i -g clawsh\` installs it for you.\n`);
+  write(path.join(dir, "README.md"), [
+    `# ${name}`,
+    "",
+    `The prebuilt \`clawsh\` binary for ${os} ${cpu}. Don't install this directly: \`npm i -g clawsh-cli\` installs it for you.`,
+    "",
+    "clawsh starts Claude Code sessions on any machine in your network and lets you attach to them from any terminal or browser.",
+    "",
+    `- Source and docs: ${main.repository.url.replace(/^git\+/, "").replace(/\.git$/, "")}`,
+    `- The same binary, with checksums: ${main.repository.url.replace(/^git\+/, "").replace(/\.git$/, "")}/releases/tag/v${version}`,
+    "- License: Apache-2.0 with the Commons Clause (free to use, modify and share; not to sell). See LICENSE.",
+    "",
+  ].join("\n"));
+  fs.copyFileSync(license, path.join(dir, "LICENSE"));
 }
 
 const mainDir = path.join(outDir, "clawsh");
@@ -59,5 +73,6 @@ main.version = version;
 for (const dep of Object.keys(main.optionalDependencies)) main.optionalDependencies[dep] = version;
 write(path.join(mainDir, "package.json"), JSON.stringify(main, null, 2) + "\n");
 fs.copyFileSync(path.join(here, "..", "README.md"), path.join(mainDir, "README.md"));
+fs.copyFileSync(license, path.join(mainDir, "LICENSE"));
 
-console.log(`staged clawsh ${version}: ${targets.length} platform packages + launcher in ${outDir}`);
+console.log(`staged ${main.name} ${version}: ${targets.length} platform packages + launcher in ${outDir}`);

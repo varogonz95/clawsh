@@ -14,18 +14,21 @@ One binary, two roles:
 - **agent**: runs on each machine, owns `claude` processes inside PTYs (ConPTY on Windows), keeps them alive while nobody is watching, and serves a small REST + WebSocket API.
 - **hub**: the `hosts / ls / new / attach / kill / web` commands, run from whichever terminal you're in.
 
-Full docs live in the [wiki](docs/wiki/Home.md); the landing page is https://varogonz95.github.io/clawsh/ (source in `site/index.html`)
+Full docs are at https://varogonz95.github.io/clawsh/docs/ (source in [`docs/wiki/`](docs/wiki/Home.md)); the landing page is https://varogonz95.github.io/clawsh/ (source in `site/index.html`)
 
 ## Setup
 
-With Node 18+: `npm i -g clawsh`, or run it without installing: `npx clawsh ls`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source you need Go 1.22+.
+Install the latest release (checks the download against the release's checksums, no sudo or admin needed):
 
 ```sh
-go mod tidy          # first time only
-make build           # or: go build -o clawsh ./cmd/clawsh
-make dist            # cross-compile all platforms into dist/
-make docker-dist     # same, built inside Docker (needs buildx, no local Go)
+curl -fsSL https://varogonz95.github.io/clawsh/install.sh | sh   # Linux, macOS
 ```
+
+```powershell
+irm https://varogonz95.github.io/clawsh/install.ps1 | iex   # Windows PowerShell
+```
+
+With Node 18+: `npm i -g clawsh-cli` (the command is still `clawsh`), or run it without installing: `npx clawsh-cli ls`. Update later with `clawsh update`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source, see [Building from source](#building-from-source).
 
 On **each machine that should host sessions**:
 
@@ -48,6 +51,27 @@ clawsh attach desk/8158                        # id prefix is enough
 clawsh kill desk/8158
 ```
 
+## Building from source
+
+Needs Go 1.22+ and `make`. No cgo, so no C toolchain is required.
+
+```sh
+git clone https://github.com/varogonz95/clawsh.git
+cd clawsh
+make build           # produces ./clawsh (or: go build -o clawsh ./cmd/clawsh)
+make test            # race-enabled tests
+make vet             # vet for linux, windows and darwin
+make dist            # cross-compile all platforms into dist/
+make docker-dist     # same, built inside Docker (needs buildx, no local Go)
+```
+
+Try it without installing: run an agent with any command standing in for `claude`, then point a `hosts.toml` at it (see [Setup](#setup)).
+
+```sh
+./clawsh agent --claude /bin/sh     # listens on :7420
+./clawsh token                      # token for hosts.toml (url http://localhost:7420)
+```
+
 ## Security
 
 Anyone holding an agent's token can run Claude Code on that machine, with that machine's permissions. Traffic is plain HTTP, so keep agents on a trusted LAN until TLS/Tailscale support lands (see `docs/PLAN.md`). The command an agent runs is fixed by `--claude` on the agent; the API only accepts extra args.
@@ -58,3 +82,7 @@ Anyone holding an agent's token can run Claude Code on that machine, with that m
 - Sessions stop when the agent stops. `claude --resume` recovers the conversation.
 - Status is `running` / `exited`. Working / idle / needs-input arrives with M3.
 - Windows: killing a session doesn't yet kill claude's child processes (Job Object TODO).
+
+## License
+
+clawsh is source-available under the [Apache License 2.0 with the Commons Clause](LICENSE). You can use it for free, including at work, and copy, modify and share it, but you can't sell it or charge for a product or service (hosting, support, consulting) whose value comes mostly from clawsh.
