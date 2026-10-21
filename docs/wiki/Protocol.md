@@ -21,9 +21,11 @@ Failures return `401` with `{"error":"unauthorized"}`. All errors use `{"error":
 | `POST` | `/v1/sessions` | Create a session |
 | `DELETE` | `/v1/sessions/{id}` | Stop and remove a session |
 | `GET` | `/v1/sessions/{id}/attach` | WebSocket upgrade |
+| `GET` | `/v1/dirs/recent` | `{"dirs":[...]}`: folders sessions were started in, most recent first (at most 20), without folders that no longer exist; `[]` when the agent keeps no history |
 | `GET` | `/v1/external` | Array of external sessions, oldest first |
 | `PUT` | `/v1/external/{id}` | Announce or renew an external session |
 | `DELETE` | `/v1/external/{id}` | Withdraw an external session |
+| `POST` | `/v1/hooks` | Report a Claude Code hook event (`204` applied, `202` ignored, `400` bad JSON) |
 
 `{id}` may be a unique prefix. An ambiguous prefix or unknown ID is an error.
 
@@ -42,7 +44,7 @@ Failures return `401` with `{"error":"unauthorized"}`. All errors use `{"error":
 }
 ```
 
-`status` is `running` or `exited`. `exit_code` is present only once exited; `args` only when non-empty.
+`status` is `running` (live, no hook seen yet), `working`, `idle`, `needs_input` (driven by [hooks](#hooks)), or `exited`; `gone` is reserved for external sessions. An exited session stays `exited`. `origin` is `managed` for sessions the agent spawned. `exit_code` is present only once exited; `args` only when non-empty. `claude_session_id`, `transcript` and `last_event` appear after the first hook.
 
 ### Create request
 
@@ -51,6 +53,10 @@ Failures return `401` with `{"error":"unauthorized"}`. All errors use `{"error":
 ```
 
 All fields are optional. `dir` defaults to the agent user's home and `~` is expanded on the agent. Size defaults to 120×40. There is no field for the executable; that is fixed by the agent's `--claude` flag.
+
+### Hooks
+
+`POST /v1/hooks` takes `{"event","session_id","transcript_path","cwd","message","clawsh_session_id","pid"}` (`message` and `clawsh_session_id` optional). With a `clawsh_session_id` matching a managed session, the event sets its status: `UserPromptSubmit` → `working`, `Stop` and `SessionStart` → `idle`, `Notification` → `needs_input`, `SessionEnd` → unchanged. Events without a known `clawsh_session_id` answer `202` and are ignored.
 
 ### External sessions
 

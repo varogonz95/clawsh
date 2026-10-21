@@ -3,6 +3,8 @@ name: pages
 # Builds the site (site/ plus docs/wiki/ rendered under docs/, see
 # scripts/docs/build.mjs) and deploys it to GitHub Pages from main. Pull
 # requests only build, so a broken docs link fails the PR, not the deploy.
+# The header shows the newest release tag, so release.yml dispatches this
+# after publishing one.
 
 on:
   push:
@@ -24,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the tags, for the release label
       - uses: actions/setup-node@v4
         with:
           node-version: 22
