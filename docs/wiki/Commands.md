@@ -27,6 +27,10 @@ The executable is fixed here. The API only lets clients add arguments, never cho
 
 Prints the agent's token, creating it if needed. Accepts `--token-file`.
 
+### `clawsh hook <Event> [--listen :7420] [--token-file path]`
+
+A Claude Code hook command (`SessionStart`, `UserPromptSubmit`, `Stop`, `Notification`, `SessionEnd`). Reads the hook JSON on stdin and reports it to the local agent, adding `CLAWSH_SESSION_ID` from the environment. It prints nothing and always exits 0, even with no agent, a bad token or bad input (errors go to stderr, 1 s timeout). It never creates the token file.
+
 ### `clawsh mcp`
 
 An MCP stdio server with no tools, run by Claude Code through the [plugin](Plugin.md). It starts a detached agent if none answers, and announces the session to the agent. Flags are listed on the plugin page.
@@ -43,7 +47,7 @@ Checks every configured agent: health, then an authenticated call. Timeout is 3 
 
 ### `clawsh ls [host]`
 
-Alias: `list`. Lists sessions on every host, or just one. Columns: `TARGET`, `NAME`, `STATUS` (`running`, `exited(code)`, or `external` for sessions announced by the [plugin](Plugin.md)), `VIEWERS`, `AGE`, `DIR`. Unreachable hosts are reported on stderr after the table.
+Alias: `list`. Lists sessions on every host, or just one. Columns: `TARGET`, `NAME`, `STATUS` (`running`, `working`, `idle`, `needs_input`, `exited(code)`, or `external` for sessions announced by the [plugin](Plugin.md)), `VIEWERS`, `AGE`, `DIR`. Unreachable hosts are reported on stderr after the table.
 
 ### `clawsh new <host> [flags] [-- claude args...]`
 
