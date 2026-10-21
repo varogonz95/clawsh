@@ -50,6 +50,8 @@ git tag v0.1.0 && git push origin v0.1.0
 
 `.github/workflows/claude.yml` has Claude review each pull request (when it's opened, on every push, when it leaves draft, and when it's assigned to Claude) with inline comments, and answer `@claude` mentions in PR and issue comments. It needs the Claude GitHub App on the repo and a `CLAUDE_CODE_OAUTH_TOKEN` secret (from `claude setup-token`). Pull requests from forks aren't reviewed.
 
+Mentioning `@varogonz95-claudebot` in a PR or issue comment runs the same kind of job, but Claude comments, commits and pushes as the `varogonz95-claudebot` account instead of the Claude App. Only the repo owner, members and collaborators can start it. It needs a `CLAUDEBOT_TOKEN` secret: a fine-grained token of that account (which must be a collaborator with write access) for this repository, with read and write on Contents, Issues and Pull requests. Its pushes use a real token, so they trigger CI and the review job.
+
 ### npm trusted publishing
 
 npm publishing uses [trusted publishing](https://docs.npmjs.com/trusted-publishers): the workflow proves who it is with GitHub's OIDC token, so there's no npm token secret, and every version gets a provenance statement. Each of the seven packages needs `varogonz95/clawsh` with workflow `release.yml` added as a trusted publisher on npmjs.com (package Settings → Trusted publishing). npm only lets you do that for a package that already exists, so the first time:
