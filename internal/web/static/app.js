@@ -27,6 +27,55 @@ function takeKey() {
 }
 const KEY = takeKey();
 
+// The version of clawsh web that served this page (index.html meta tag).
+const metaVersion = document.querySelector('meta[name="clawsh-version"]');
+const PAGE_VERSION = metaVersion ? metaVersion.content : '';
+const RELOAD_STORE = 'clawsh.reloadedFor';
+
+// semverCmp compares release versions by their numeric core; a pre-release
+// sorts below its release. Returns null when either side isn't a version
+// (dev builds), so callers never flag those.
+function parseSemver(v) {
+  if (/-\d+-g[0-9a-f]+|-dirty$/.test(String(v))) return null; // git describe: a build past a tag
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(String(v || ''));
+  return m ? { core: [+m[1], +m[2], +m[3]], pre: m[4] || '' } : null;
+}
+function semverCmp(a, b) {
+  const x = parseSemver(a), y = parseSemver(b);
+  if (!x || !y) return null;
+  for (let i = 0; i < 3; i++) if (x.core[i] !== y.core[i]) return x.core[i] < y.core[i] ? -1 : 1;
+  if (x.pre === y.pre) return 0;
+  if (!x.pre) return 1;
+  if (!y.pre) return -1;
+  const c = x.pre.localeCompare(y.pre, 'en', { numeric: true });
+  return c < 0 ? -1 : c > 0 ? 1 : 0;
+}
+
+// hostOlder reports whether a host runs an older clawsh than this hub.
+function hostOlder(host, hubVersion) {
+  return !!(host.health && semverCmp(host.health.version, hubVersion) === -1);
+}
+
+// checkVersion reloads once into a new clawsh web version. If a reload for
+// that version already happened and the page is still old, it asks instead of
+// looping.
+function checkVersion(ov) {
+  if (!PAGE_VERSION || !ov.version || ov.version === PAGE_VERSION) return;
+  let done = null;
+  try { done = sessionStorage.getItem(RELOAD_STORE); } catch (_) { /* storage blocked */ }
+  if (done === ov.version) { showUpdatedBanner(); return; }
+  try { sessionStorage.setItem(RELOAD_STORE, ov.version); } catch (_) { /* reload anyway */ }
+  location.reload(); // keeps the hash, so a session view comes back
+}
+
+function showUpdatedBanner() {
+  if (document.getElementById('updated-banner')) return;
+  const b = h('div', { id: 'updated-banner', class: 'banner updated', role: 'alert' },
+    h('span', { class: 'grow' }, 'clawsh was updated. Reload to finish.'),
+    h('button', { class: 'btn primary small', type: 'button', onclick: () => location.reload() }, 'Reload'));
+  document.body.prepend(b);
+}
+
 const ICONS = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
@@ -159,6 +208,7 @@ function connectEvents() {
   const es = new EventSource(`/api/events?k=${encodeURIComponent(KEY)}`);
   es.addEventListener('overview', (e) => {
     state.overview = JSON.parse(e.data);
+    checkVersion(state.overview);
     state.live = 'live';
     render();
   });
@@ -259,11 +309,18 @@ function hostCard(host) {
       tile(host.name, true),
       h('div', { class: 'grow' },
         h('h2', {}, host.name),
-        h('div', { class: 'mono small muted' }, `${host.health.os} · ${hostAddr(host.url)}`)),
+        h('div', { class: 'mono small muted' }, `${host.health.os} · clawsh ${host.health.version} · ${hostAddr(host.url)}`)),
+      olderPill(host),
       h('span', { class: 'pill ok' }, 'Online')),
     host.sessions.map((s) => sessionRow(host.name, s)),
     h('div', { class: 'card-foot' },
       h('a', { class: 'link', href: `#/new/${encodeURIComponent(host.name)}`, 'data-key': `new:${host.name}` }, icon('plus'), `New session on ${host.name}`)));
+}
+
+function olderPill(host) {
+  const ov = state.overview;
+  if (!ov || !hostOlder(host, ov.version)) return null;
+  return h('span', { class: 'pill warn', title: `run \`clawsh update\` on ${host.name}` }, 'older than this hub');
 }
 
 function sessionRow(hostName, s) {
@@ -363,7 +420,10 @@ function hostsPage(ov) {
       : h('span', { class: 'pill warn' }, o.error === AUTH_ERROR ? 'Key rejected' : 'Offline');
     return h('li', { class: 'host-row' },
       tile(x.name, !!(o && o.online)),
-      h('div', { class: 'grow' }, h('strong', {}, x.name), h('div', { class: 'mono small muted' }, hostAddr(x.url))),
+      h('div', { class: 'grow' }, h('strong', {}, x.name),
+        h('div', { class: 'mono small muted' }, o && o.online ? `${o.health.os} · clawsh ${o.health.version} · ${hostAddr(x.url)}` : hostAddr(x.url)),
+        o && o.online && ov && hostOlder(o, ov.version) ? h('div', { class: 'small warn-text' }, 'older than this hub: run ', h('code', {}, 'clawsh update'), ` on ${x.name}`) : null),
+      o && o.online ? olderPill(o) : null,
       status,
       h('button', { class: 'btn ghost small', type: 'button', onclick: () => openHostDialog(x) }, 'Edit'),
       h('button', { class: 'btn danger small', type: 'button', onclick: () => removeHost(x) }, 'Remove'));

@@ -9,8 +9,12 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"html"
 	"io/fs"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -74,7 +78,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	// The page and its assets hold no secrets; everything that does is under /api.
 	mux.HandleFunc("GET /{$}", s.serveIndex)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", s.cacheStatic(static, http.FileServerFS(static))))
 	mux.Handle("GET /api/events", s.api(s.events))
 	mux.Handle("POST /api/hosts/{host}/sessions", s.api(s.create))
 	mux.Handle("GET /api/hosts/{host}/dirs/recent", s.api(s.recentDirs))
@@ -92,6 +96,38 @@ func (s *Server) routes() *http.ServeMux {
 	return mux
 }
 
+// staticRef matches a /static/ URL in an attribute of index.html.
+var staticRef = regexp.MustCompile(`((?:src|href)=")(/static/[^"?]+)"`)
+
+// versionedIndex stamps index.html with the hub version: a meta tag the page
+// compares with the overview's version, and ?v=<version> on every static URL
+// so an upgrade never reuses a cached file.
+func versionedIndex(b []byte, version string) []byte {
+	q := "?v=" + url.QueryEscape(version)
+	out := staticRef.ReplaceAll(b, []byte(`${1}${2}`+q+`"`))
+	meta := `<meta name="clawsh-version" content="` + html.EscapeString(version) + `">` + "\n</head>"
+	return []byte(strings.Replace(string(out), "</head>", meta, 1))
+}
+
+// cacheStatic makes browsers revalidate static files. The embed FS has no
+// modtime, so the ETag is the version plus the path.
+func (s *Server) cacheStatic(files fs.FS, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := fs.Stat(files, strings.TrimPrefix(r.URL.Path, "/")); err != nil {
+			next.ServeHTTP(w, r) // let the file server answer 404
+			return
+		}
+		etag := `"` + api.Version + `:` + r.URL.Path + `"`
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("ETag", etag)
+		if r.Header.Get("If-None-Match") == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) serveIndex(w http.ResponseWriter, _ *http.Request) {
 	b, err := staticFiles.ReadFile("static/index.html")
 	if err != nil {
@@ -104,7 +140,7 @@ func (s *Server) serveIndex(w http.ResponseWriter, _ *http.Request) {
 	// policy could break xterm.js.
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
-	_, _ = w.Write(b)
+	_, _ = w.Write(versionedIndex(b, api.Version))
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
