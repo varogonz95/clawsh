@@ -28,7 +28,7 @@ curl -fsSL https://varogonz95.github.io/clawsh/install.sh | sh   # Linux, macOS
 irm https://varogonz95.github.io/clawsh/install.ps1 | iex   # Windows PowerShell
 ```
 
-With Node 18+: `npm i -g clawsh`, or run it without installing: `npx clawsh ls`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source, see [Building from source](#building-from-source).
+With Node 18+: `npm i -g clawsh-cli` (the command is still `clawsh`), or run it without installing: `npx clawsh-cli ls`. Update later with `clawsh update`. Prebuilt binaries are also on the [Releases](https://github.com/varogonz95/clawsh/releases) page. To build from source, see [Building from source](#building-from-source).
 
 On **each machine that should host sessions**:
 

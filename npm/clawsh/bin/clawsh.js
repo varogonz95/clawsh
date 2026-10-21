@@ -9,7 +9,10 @@ const { resolveBinary } = require("../lib/resolve");
 
 resolveBinary()
   .then((bin) => {
-    const r = spawnSync(bin, process.argv.slice(2), { stdio: "inherit" });
+    const r = spawnSync(bin, process.argv.slice(2), {
+      stdio: "inherit",
+      env: { ...process.env, CLAWSH_LAUNCHER: "npm" },
+    });
     if (r.error) {
       console.error(`clawsh: could not run ${bin}: ${r.error.message}`);
       process.exit(1);
