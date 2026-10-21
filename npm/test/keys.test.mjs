@@ -23,3 +23,12 @@ test("everything else does not", () => {
   assert.equal(keys.shiftEnterNewline(ev({ type: "keyup" })), false);
   assert.equal(keys.shiftEnterNewline(ev({ type: "keypress" })), false);
 });
+
+test("isShiftEnter ignores the event type but not IME composition", () => {
+  for (const type of ["keydown", "keypress", "keyup"]) {
+    assert.equal(keys.isShiftEnter(ev({ type })), true);
+  }
+  assert.equal(keys.isShiftEnter(ev({ isComposing: true })), false);
+  assert.equal(keys.isShiftEnter(ev({ shiftKey: false })), false);
+  assert.equal(keys.isShiftEnter(ev({ ctrlKey: true })), false);
+});
