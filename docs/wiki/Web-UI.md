@@ -21,7 +21,7 @@ To keep the access key off the command line, the browser is opened through a sho
 ## What you see
 
 - **Your machines:** a card per host with its sessions. Offline machines show why. The page updates by itself.
-- **A session:** the terminal fills the page. Leaving it only disconnects you; Claude keeps working. Shift+Enter inserts a newline in a Claude Code prompt instead of submitting it (it sends ESC+CR).
+- **A session:** the terminal fills the page. Leaving it only disconnects you; Claude keeps working. Shift+Enter inserts a newline in a Claude Code prompt instead of submitting it (it sends ESC+CR, the same bytes as Alt+Enter, so in a plain shell session it is not a plain Enter).
 - **New session:** pick a machine, a folder and optionally a name and extra Claude arguments.
 - **No machines yet:** the steps to add one. The page notices when you save `hosts.toml`.
 - **Hosts file errors:** if `hosts.toml` stops parsing while `clawsh web` runs, a banner shows the error and the page keeps the machines from the last good version until you fix and save it.
