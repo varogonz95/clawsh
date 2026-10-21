@@ -111,6 +111,12 @@ h1, h2 { margin: 0; letter-spacing: -0.02em; }
 .pill.warn { color: var(--warn-ink); background: var(--warn-bg); }
 .row { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-top: 1px solid var(--rule); min-height: 44px; color: inherit; text-decoration: none; }
 a.row:hover { background: var(--raised); color: inherit; }
+.row.split { padding: 0 20px 0 0; }
+.row.split:hover { background: var(--raised); }
+.row-link { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; padding: 14px 0 14px 20px; color: inherit; text-decoration: none; }
+.row-link:hover { color: inherit; }
+.icon-btn { padding-left: 8px; padding-right: 8px; flex: none; }
+.icon-btn .icon { display: inline-flex; width: 18px; height: 18px; }
 .row-title { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .mono { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewers { display: inline-flex; align-items: center; gap: 4px; }

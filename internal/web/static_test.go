@@ -140,3 +140,19 @@ func TestStaticETagFollowsContent(t *testing.T) {
 		t.Error("ETag not stable for the same content")
 	}
 }
+
+// The duplicate-session route and its helpers must ship in app.js.
+func TestAppHasDuplicate(t *testing.T) {
+	_, base := startServer(t, noHosts(t))
+	resp, err := login(t, base).Get(base + "/static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	for _, want := range []string{"'dup'", "nextName", "joinArgs", "splitArgs"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+}
