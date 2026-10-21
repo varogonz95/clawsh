@@ -28,6 +28,7 @@ Stop the agent, delete its `agent.token` (see [Configuration](Configuration.md))
 - Browsers installed as Snaps (e.g. Ubuntu's default Firefox) can't read temporary files. If the browser shows "file not found", open the link printed in the terminal.
 - The key is deliberately not a cookie: browsers send a host's cookies to every port on it, so another user's server on another local port could collect one.
 - Requests whose `Host` isn't `127.0.0.1`/`localhost` on its port are refused (DNS rebinding). WebSockets and write requests from other origins are refused (cross-site requests).
-- The browser never receives tokens or talks to agents directly.
+- The browser never receives tokens or talks to agents directly. The Machines page takes tokens in but never returns them: lists and connection tests only say whether a token is set, and test errors never echo the address.
+- The Machines page can rewrite `hosts.toml` (the file that holds every token). It does so atomically with mode `0600`, behind the access key and the Host/Origin checks above, and keeps the previous file as `hosts.toml.bak`.
 
 It does not protect against software already running as your user on that computer, which could read `hosts.toml` anyway.

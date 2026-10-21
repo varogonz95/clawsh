@@ -5,8 +5,12 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -245,5 +249,59 @@ func TestHookStatus(t *testing.T) {
 	}
 	if got := status(); got.Status != api.StatusExited || got.ExitCode == nil || *got.ExitCode != 3 {
 		t.Fatalf("after exit = %+v", got)
+  }
+}
+
+func TestRecentDirsEndpoint(t *testing.T) {
+	a, b := t.TempDir(), t.TempDir()
+	m := agent.NewManager(agent.Options{Command: "/bin/sh", HistoryFile: filepath.Join(t.TempDir(), "recent-dirs.json")})
+	defer m.Shutdown()
+	srv := httptest.NewServer(agent.NewServer(m, "secret").Handler())
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := http.Get(srv.URL + "/v1/dirs/recent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no token: %d, want 401", resp.StatusCode)
+	}
+
+	c := hub.NewClient(hub.Host{Name: "t", URL: srv.URL, Token: "secret"})
+	if got, err := c.RecentDirs(ctx); err != nil || got.Dirs == nil || len(got.Dirs) != 0 {
+		t.Fatalf("empty history = %#v, %v", got, err)
+	}
+	for _, d := range []string{a, b} {
+		if _, err := c.Create(ctx, api.CreateRequest{Dir: d}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := c.RecentDirs(ctx)
+	if err != nil || !reflect.DeepEqual(got.Dirs, []string{b, a}) {
+		t.Fatalf("history = %v, %v; want [%s %s]", got.Dirs, err, b, a)
+	}
+	os.RemoveAll(a)
+	if got, _ := c.RecentDirs(ctx); !reflect.DeepEqual(got.Dirs, []string{b}) {
+		t.Fatalf("after delete = %v", got.Dirs)
+	}
+
+	// History disabled: empty list, not null.
+	m2 := agent.NewManager(agent.Options{Command: "/bin/sh"})
+	defer m2.Shutdown()
+	srv2 := httptest.NewServer(agent.NewServer(m2, "secret").Handler())
+	defer srv2.Close()
+	req, _ := http.NewRequest(http.MethodGet, srv2.URL+"/v1/dirs/recent", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	resp2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	body, _ := io.ReadAll(resp2.Body)
+	if strings.TrimSpace(string(body)) != `{"dirs":[]}` {
+		t.Fatalf("disabled body = %s", body)
 	}
 }

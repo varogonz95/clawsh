@@ -1,0 +1,161 @@
+name: release-hotfix
+
+# Ships chosen commits from main as a patch on top of an earlier release:
+#   gh workflow run release-hotfix.yml -f version=0.1.1 -f commits="<sha> <sha>"
+# It checks out release/<major>.<minor> (created from the newest v<major>.<minor>.*
+# tag the first time), cherry-picks the commits with -x, tags the result and
+# pushes the branch and tag together, which starts release.yml. Like
+# release-cut.yml it commits no version: the version lives only in the tag.
+# To release main as it is, use release-cut.yml.
+#
+# Needs the same RELEASE_TOKEN secret as release-cut.yml (in the `releases`
+# environment, which this job runs in), and the token must
+# be allowed to push release/* branches. Picking a commit that changes
+# .github/workflows/ also needs the token's Workflows: read and write permission.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v: 0.1.1, or 0.1.1-rc.1 for a pre-release"
+        required: true
+        type: string
+      commits:
+        description: "Commits on main to cherry-pick, oldest first, separated by spaces"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Shared with release-cut.yml: one release runs at a time and at most one
+# waits; a newer dispatch cancels the waiting one, so dispatch the next release
+# after the previous run finishes.
+concurrency:
+  group: release-dispatch
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    environment: releases
+    env:
+      VERSION: ${{ inputs.version }}
+      COMMITS: ${{ inputs.commits }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check inputs
+        run: |
+          if [[ -z $RELEASE_TOKEN ]]; then
+            echo "::error::Secret RELEASE_TOKEN is not set (see the header of release-hotfix.yml)"
+            exit 1
+          fi
+          if [[ ! $COMMITS =~ ^[0-9a-f]{7,40}( [0-9a-f]{7,40})*$ ]]; then
+            echo "::error::commits must be hex SHAs separated by single spaces"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Cherry-pick, tag and push
+        run: |
+          set -euo pipefail
+          cp scripts/release/lib.sh "$RUNNER_TEMP/lib.sh"
+          source "$RUNNER_TEMP/lib.sh"
+
+          if [[ ! $VERSION =~ $SEMVER_RE ]]; then
+            echo "::error::'$VERSION' is not a semantic version like 1.2.3 or 1.2.3-rc.1 (no leading v)"
+            exit 1
+          fi
+          tag="v$VERSION"
+          line=$(core "$VERSION" | cut -d. -f1,2)
+          branch="release/$line"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::Tag $tag already exists"; exit 1
+          fi
+          newest=$(highest_stable "v$line.*")
+          if [[ -z $newest ]]; then
+            echo "::error::No v$line.* release to patch; for a new minor line use release-cut.yml"
+            exit 1
+          fi
+          if ! version_gt "$VERSION" "$newest"; then
+            echo "::error::$VERSION is not newer than v$newest, the latest $line.x release"
+            exit 1
+          fi
+
+          # Resolve and check every commit before touching anything.
+          shas=()
+          for c in $COMMITS; do
+            sha=$(git rev-parse --verify "$c^{commit}")
+            if ! git merge-base --is-ancestor "$sha" origin/main; then
+              echo "::error::$c is not on main"; exit 1
+            fi
+            if (( $(git rev-list --parents -n1 "$sha" | wc -w) > 2 )); then
+              echo "::error::$c is a merge commit; pass the commits it merged instead"; exit 1
+            fi
+            if [[ -n $(git diff-tree --no-commit-id --name-only -r "$sha" -- .github/workflows/) ]]; then
+              echo "::notice::${sha:0:7} changes .github/workflows/; pushing it needs RELEASE_TOKEN's Workflows: read and write permission"
+            fi
+            shas+=("$sha")
+          done
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git fetch -q origin "$branch"
+            git checkout -q -B "$branch" "origin/$branch"
+            # A later release of this line cut from main (release-cut) isn't on
+            # the branch; tagging the branch would drop what that release shipped.
+            if ! git merge-base --is-ancestor "v$newest" HEAD; then
+              echo "::error::$branch does not contain v$newest, the latest $line.x release, so this hotfix would drop changes that already shipped. Merge v$newest into $branch by hand, then re-run."
+              exit 1
+            fi
+          else
+            echo "Creating $branch from v$newest"
+            git checkout -q -B "$branch" "v$newest"
+          fi
+          start=$(git rev-parse HEAD)
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for sha in "${shas[@]}"; do
+            if git cherry-pick -x "$sha" >/dev/null 2>&1; then
+              continue
+            fi
+            conflicts=$(git diff --name-only --diff-filter=U)
+            if [[ -z $conflicts ]] && git diff --cached --quiet; then
+              # Nothing left to apply: the change is already on the branch.
+              git cherry-pick --skip
+              echo "::notice::${sha:0:7} is already on $branch; skipped"
+              continue
+            fi
+            git cherry-pick --abort
+            echo "::error::Cherry-picking ${sha:0:7} onto $branch conflicts in: $(echo $conflicts). Pick it by hand on the branch, or add the commits it depends on first."
+            exit 1
+          done
+          if [[ $(git rev-parse HEAD) == "$start" ]]; then
+            echo "::error::Every commit is already on $branch; nothing to release"
+            exit 1
+          fi
+
+          # The tag runs release.yml as it is on this commit. Without the Channel step
+          # it would publish to GitHub's Latest and npm's latest.
+          if ! grep -q 'id: channel' .github/workflows/release.yml; then
+            fix=$(git log -1 --format=%h -S'id: channel' origin/main -- .github/workflows/release.yml)
+            echo "::error::release.yml on $branch predates the Latest/npm dist-tag handling, so this hotfix would become the latest release. Add the commit on main that changed release.yml (${fix:-see git log -- .github/workflows/release.yml}) to commits; RELEASE_TOKEN then needs Workflows: read and write."
+            exit 1
+          fi
+
+          git tag -a "$tag" -m "clawsh $tag"
+          git push --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$tag"
+
+          {
+            echo "### Tagged $tag on $branch"
+            echo "Picked: ${shas[*]}"
+            echo "[release.yml](../../actions/workflows/release.yml) is publishing it."
+          } >> "$GITHUB_STEP_SUMMARY"

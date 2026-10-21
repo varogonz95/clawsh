@@ -21,6 +21,7 @@ Failures return `401` with `{"error":"unauthorized"}`. All errors use `{"error":
 | `POST` | `/v1/sessions` | Create a session |
 | `DELETE` | `/v1/sessions/{id}` | Stop and remove a session |
 | `GET` | `/v1/sessions/{id}/attach` | WebSocket upgrade |
+| `GET` | `/v1/dirs/recent` | `{"dirs":[...]}`: folders sessions were started in, most recent first (at most 20), without folders that no longer exist; `[]` when the agent keeps no history |
 | `GET` | `/v1/external` | Array of external sessions, oldest first |
 | `PUT` | `/v1/external/{id}` | Announce or renew an external session |
 | `DELETE` | `/v1/external/{id}` | Withdraw an external session |
