@@ -556,6 +556,7 @@ function splitArgs(text) {
     else if (/\s/.test(c)) { if (has || cur) out.push(cur); cur = ''; has = false; }
     else { cur += c; has = true; }
   }
+  if (quoted) throw new Error('Unclosed quote in the arguments.');
   if (has || cur) out.push(cur);
   return out;
 }
@@ -680,7 +681,8 @@ async function submitNew(form, err, submit) {
   const host = data.get('host');
   if (!host) { err.textContent = 'Pick a machine.'; return; }
   const text = (k) => String(data.get(k) || '').trim();
-  const args = splitArgs(text('args'));
+  let args;
+  try { args = splitArgs(text('args')); } catch (e) { err.textContent = e.message; return; }
   const size = estimateTermSize();
   submit.disabled = true;
   err.textContent = '';
