@@ -1,6 +1,5 @@
 {
   "name": "clawsh",
-  "version": "0.2.0",
   "description": "Keeps a local clawsh agent running and lists every Claude Code session in `clawsh ls`. Requires the clawsh binary on PATH.",
   "author": { "name": "varogonz95" },
   "homepage": "https://varogonz95.github.io/clawsh/",

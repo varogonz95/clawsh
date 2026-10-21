@@ -21,10 +21,10 @@ To keep the access key off the command line, the browser is opened through a sho
 ## What you see
 
 - **Your machines:** a card per host with its sessions. Offline machines show why. The page updates by itself.
-- **Versions:** each online machine shows the clawsh version it runs; one older than the hub gets an "older than this hub" tag with the hint to run `clawsh update` on it. Dev builds are never flagged.
-- **After an upgrade:** an open tab reloads itself once into the new `clawsh web` version and keeps its place (the URL hash). If the new version still doesn't load, a banner asks you to reload. Static files are served with `Cache-Control: no-cache` and versioned URLs, so a browser never keeps an old script.
+- **Versions:** each online machine shows the clawsh version it runs. An agent older than the hub gets an "older than this hub" pill (run `clawsh update` on that machine); dev builds are never flagged.
+- **Upgrades:** after `clawsh web` is upgraded, an open tab reloads itself once into the new version (keeping its place in a session). If it still shows the old version after that, a banner asks you to reload. Static files are served with `Cache-Control: no-cache` and an `ETag`, and `index.html` links them with `?v=<version>`, so a browser never keeps stale JS or CSS.
 - **A session:** the terminal fills the page. Leaving it only disconnects you; Claude keeps working.
-- **New session:** pick a machine, a folder and optionally a name and extra Claude arguments.
+- **New session:** pick a machine, a folder and optionally a name and extra Claude arguments. Under the folder field, the folders recently used on that machine show up (3 at first, "Show all" for the rest); click one to fill the field. The list follows the machine you pick and stays hidden when there is none.
 - **Machines page** (`Machines` in the top bar): add, edit, test and remove machines without editing `hosts.toml`. The access key field is write-only: saved keys are never sent back to the browser, and leaving it empty on edit keeps the saved key. *Test connection* checks the address and key (reports reachable, unreachable or key rejected) before or after saving. Saving rewrites `hosts.toml` (written atomically, mode `0600`); comments in a hand-edited file are dropped, and the previous version is kept as `hosts.toml.bak`. If `hosts.toml` doesn't parse, the page refuses to save until you fix it by hand.
 - **No machines yet:** the steps to add one, or a link to the Machines page. The page notices when you save `hosts.toml`.
 - **Hosts file errors:** if `hosts.toml` stops parsing while `clawsh web` runs, a banner shows the error and the page keeps the machines from the last good version until you fix and save it.

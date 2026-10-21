@@ -6,11 +6,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/varogonz95/clawsh/internal/agent"
 	"github.com/varogonz95/clawsh/internal/api"
 	"github.com/varogonz95/clawsh/internal/hub"
 )
@@ -131,5 +134,43 @@ func TestAgentRejectingKeyIsBadGateway(t *testing.T) {
 	json.NewDecoder(resp.Body).Decode(&e)
 	if resp.StatusCode != http.StatusBadGateway || !strings.Contains(e.Error, "access key rejected") {
 		t.Fatalf("got %d %q, want 502 containing 'access key rejected'", resp.StatusCode, e.Error)
+	}
+}
+
+func TestRecentDirsProxy(t *testing.T) {
+	m := agent.NewManager(agent.Options{Command: "/bin/sh", HistoryFile: filepath.Join(t.TempDir(), "recent-dirs.json")})
+	srv := httptest.NewServer(agent.NewServer(m, "tok").Handler())
+	t.Cleanup(func() { srv.Close(); m.Shutdown() })
+	cfg := filepath.Join(t.TempDir(), "hosts.toml")
+	writeHosts(t, cfg, testHost{"a", srv.URL, "tok"})
+	_, base := startServer(t, cfg)
+	c := login(t, base)
+
+	get := func(url string) (int, string) {
+		resp, err := c.Get(url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, strings.TrimSpace(string(b))
+	}
+	if code, body := get(base + "/api/hosts/a/dirs/recent"); code != 200 || body != `{"dirs":[]}` {
+		t.Fatalf("empty: %d %s", code, body)
+	}
+	dir := t.TempDir()
+	body, _ := json.Marshal(api.CreateRequest{Dir: dir})
+	resp, err := c.Post(base+"/api/hosts/a/sessions", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	code, got := get(base + "/api/hosts/a/dirs/recent")
+	want, _ := json.Marshal(api.RecentDirs{Dirs: []string{dir}})
+	if code != 200 || got != string(want) {
+		t.Fatalf("got %d %s, want %s", code, got, want)
+	}
+	if code, _ := get(base + "/api/hosts/nope/dirs/recent"); code != http.StatusNotFound {
+		t.Fatalf("unknown host: %d, want 404", code)
 	}
 }

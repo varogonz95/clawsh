@@ -6,9 +6,7 @@
 package web
 
 import (
-	"crypto/sha256"
 	"embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"html"
@@ -80,9 +78,10 @@ func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	// The page and its assets hold no secrets; everything that does is under /api.
 	mux.HandleFunc("GET /{$}", s.serveIndex)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", revalidate(static, http.FileServerFS(static))))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", s.cacheStatic(static, http.FileServerFS(static))))
 	mux.Handle("GET /api/events", s.api(s.events))
 	mux.Handle("POST /api/hosts/{host}/sessions", s.api(s.create))
+	mux.Handle("GET /api/hosts/{host}/dirs/recent", s.api(s.recentDirs))
 	mux.Handle("DELETE /api/hosts/{host}/sessions/{id}", s.api(s.remove))
 	mux.Handle("GET /api/hosts/{host}/sessions/{id}/attach", s.api(s.attach))
 	mux.Handle("GET /api/config/hosts", s.api(s.listHosts))
@@ -97,44 +96,40 @@ func (s *Server) routes() *http.ServeMux {
 	return mux
 }
 
-var staticRef = regexp.MustCompile(`="(/static/[^"?]+)"`)
+// staticRef matches a /static/ URL in an attribute of index.html.
+var staticRef = regexp.MustCompile(`((?:src|href)=")(/static/[^"?]+)"`)
 
-// revalidate makes browsers check /static/ files on every load. The embed FS
-// has no modtime, so the ETag is the hub version, the path and a hash of the
-// content: builds that share a version string (dev) still get new ETags.
-func revalidate(root fs.FS, next http.Handler) http.Handler {
+// versionedIndex stamps index.html with the hub version: a meta tag the page
+// compares with the overview's version, and ?v=<version> on every static URL
+// so an upgrade never reuses a cached file.
+func versionedIndex(b []byte, version string) []byte {
+	q := "?v=" + url.QueryEscape(version)
+	out := staticRef.ReplaceAll(b, []byte(`${1}${2}`+q+`"`))
+	meta := `<meta name="clawsh-version" content="` + html.EscapeString(version) + `">` + "\n</head>"
+	return []byte(strings.Replace(string(out), "</head>", meta, 1))
+}
+
+// cacheStatic makes browsers revalidate static files. The embed FS has no
+// modtime, so the ETag is the version plus the path.
+func (s *Server) cacheStatic(files fs.FS, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		etag := `"` + api.Version + `:` + r.URL.Path + `"`
-		if b, err := fs.ReadFile(root, r.URL.Path); err == nil {
-			sum := sha256.Sum256(b)
-			etag = `"` + api.Version + `:` + r.URL.Path + `:` + hex.EncodeToString(sum[:8]) + `"`
+		if _, err := fs.Stat(files, strings.TrimPrefix(r.URL.Path, "/")); err != nil {
+			next.ServeHTTP(w, r) // let the file server answer 404
+			return
 		}
+		etag := `"` + api.Version + `:` + r.URL.Path + `"`
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("ETag", etag)
-		for _, c := range strings.Split(r.Header.Get("If-None-Match"), ",") {
-			if strings.TrimSpace(c) == etag {
-				w.WriteHeader(http.StatusNotModified)
-				return
-			}
+		if r.Header.Get("If-None-Match") == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-// indexHTML returns index.html with the hub version in a meta tag and on
-// every /static/ URL, so a new version never runs an old cached script.
-func indexHTML() ([]byte, error) {
-	b, err := staticFiles.ReadFile("static/index.html")
-	if err != nil {
-		return nil, err
-	}
-	out := staticRef.ReplaceAll(b, []byte(`="$1?v=`+url.QueryEscape(api.Version)+`"`))
-	meta := `<meta name="clawsh-version" content="` + html.EscapeString(api.Version) + `">` + "\n</head>"
-	return []byte(strings.Replace(string(out), "</head>", meta, 1)), nil
-}
-
 func (s *Server) serveIndex(w http.ResponseWriter, _ *http.Request) {
-	b, err := indexHTML()
+	b, err := staticFiles.ReadFile("static/index.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -145,7 +140,7 @@ func (s *Server) serveIndex(w http.ResponseWriter, _ *http.Request) {
 	// policy could break xterm.js.
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
-	_, _ = w.Write(b)
+	_, _ = w.Write(versionedIndex(b, api.Version))
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

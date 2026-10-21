@@ -2,6 +2,7 @@
 //
 // Transport:
 //   - REST (JSON) for session lifecycle: /v1/health, /v1/sessions, /v1/sessions/{id}
+//   - REST (JSON) for the folders sessions were started in: GET /v1/dirs/recent
 //   - REST (JSON) for external sessions (claude started outside clawsh, announced
 //     by `clawsh mcp`): GET /v1/external, PUT/DELETE /v1/external/{id}
 //   - WebSocket for attach: /v1/sessions/{id}/attach
@@ -37,6 +38,11 @@ type Session struct {
 	Status   Status    `json:"status"`
 	ExitCode *int      `json:"exit_code,omitempty"`
 	Viewers  int       `json:"viewers"`
+}
+
+// RecentDirs answers GET /v1/dirs/recent.
+type RecentDirs struct {
+	Dirs []string `json:"dirs"` // absolute paths, most recent first; never null
 }
 
 type CreateRequest struct {
@@ -99,9 +105,8 @@ type HostOverview struct {
 // Overview is the payload of the web UI's "overview" event.
 // ConfigError is set while hosts.toml doesn't parse; Hosts then holds the
 // last hosts that did.
-// Version is the hub's clawsh version; a page running another one reloads.
 type Overview struct {
-	Version     string         `json:"version"`
+	Version     string         `json:"version"` // the hub's clawsh version
 	ConfigPath  string         `json:"config_path"`
 	ConfigError string         `json:"config_error,omitempty"`
 	Hosts       []HostOverview `json:"hosts"`
