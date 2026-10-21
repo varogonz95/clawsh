@@ -5,10 +5,12 @@ package web
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/varogonz95/clawsh/internal/api"
 )
@@ -119,5 +121,22 @@ func TestStaticMissingIs404(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound || resp.Header.Get("ETag") != "" {
 		t.Errorf("status %s, ETag %q", resp.Status, resp.Header.Get("ETag"))
+	}
+}
+
+func TestStaticETagFollowsContent(t *testing.T) {
+	etag := func(content string) string {
+		files := fstest.MapFS{"app.js": {Data: []byte(content)}}
+		h := (&Server{}).cacheStatic(files, http.FileServerFS(files))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/app.js", nil))
+		return rec.Header().Get("ETag")
+	}
+	a, b := etag("one"), etag("two")
+	if a == "" || a == b {
+		t.Errorf("ETags %q and %q: same version, different content must differ", a, b)
+	}
+	if a != etag("one") {
+		t.Error("ETag not stable for the same content")
 	}
 }
