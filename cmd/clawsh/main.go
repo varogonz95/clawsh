@@ -136,6 +136,12 @@ func runAgent(args []string) error {
 		log.Printf("generated new token in %s", *tokenFile)
 		log.Printf("add it to hosts.toml on your hub machine:  token = %q", token)
 	}
+	cfgPath := hub.DefaultConfigPath()
+	if made, err := hub.EnsureLocalHost(cfgPath, *listen, token); err != nil {
+		log.Printf("could not create %s with a local host: %v", cfgPath, err)
+	} else if made {
+		log.Printf("created %s with host %q for this agent", cfgPath, "local")
+	}
 
 	m := agent.NewManager(agent.Options{Command: *claude, Scrollback: *scrollback, HistoryFile: agent.DefaultHistoryPath()})
 	srv := &http.Server{

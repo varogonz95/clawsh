@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
+	"net"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -87,4 +90,36 @@ func EncodeConfig(hosts []Host) ([]byte, error) {
 		return nil, err
 	}
 	return b.Bytes(), nil
+}
+
+// LocalHostURL is the URL a hub on the agent's own machine uses to reach an
+// agent listening on listen: wildcard hosts become localhost.
+func LocalHostURL(listen string) string {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		host, port = listen, "7420"
+	}
+	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, port)
+}
+
+// EnsureLocalHost creates the config at path with a single "local" host for
+// the agent listening on listen, but only if the file doesn't exist. An
+// existing file is never touched.
+func EnsureLocalHost(path, listen, token string) (created bool, err error) {
+	if _, err := os.Stat(path); err == nil {
+		return false, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return false, err
+	}
+	data, err := EncodeConfig([]Host{{Name: "local", URL: LocalHostURL(listen), Token: token}})
+	if err != nil {
+		return false, err
+	}
+	if err := WriteAtomic(path, data); err != nil {
+		return false, err
+	}
+	return true, nil
 }

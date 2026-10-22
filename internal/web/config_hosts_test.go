@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/varogonz95/clawsh/internal/hub"
 )
 
 const secretToken = "tok-very-secret-0123456789"
@@ -168,8 +170,8 @@ func TestConfigHostsFailedWriteKeepsFile(t *testing.T) {
 	_, base := startServer(t, cfg)
 	c := login(t, base)
 
-	renameFile = func(string, string) error { return os.ErrPermission }
-	defer func() { renameFile = os.Rename }()
+	hub.RenameFile = func(string, string) error { return os.ErrPermission }
+	defer func() { hub.RenameFile = os.Rename }()
 	code, body := call(t, c, "POST", base+"/api/config/hosts", hostBody{Name: "c", URL: "http://x:1", Token: "t"})
 	if code != 500 {
 		t.Fatalf("failed write: %d %s", code, body)
