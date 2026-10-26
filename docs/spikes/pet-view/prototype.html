@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>clawsh pet view prototype</title>
+<style>
+:root{--ground:#0b1a1c;--panel:#10262a;--ink:#e2f2ed;--ink-soft:#9bbdb5;--rule:#1f3c40;--bubble:#e2f2ed;--bubble-ink:#0b1a1c;--accent:#ff6a52}
+@media (prefers-color-scheme:light){:root{--ground:#eef6f3;--panel:#fff;--ink:#12302e;--ink-soft:#456;--rule:#c7dcd6;--bubble:#12302e;--bubble-ink:#fff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:14px system-ui,sans-serif}
+header{display:flex;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--rule)}
+header h1{font-size:15px;margin:0}
+header span{color:var(--ink-soft)}
+#stage{position:relative;height:calc(100vh - 150px);min-height:360px;overflow:hidden}
+.pet{position:absolute;width:120px;margin:-60px 0 0 -60px;text-align:center;cursor:pointer;transition:left 3s ease-in-out,top 3s ease-in-out,opacity .6s,transform .6s}
+.pet.sub{width:44px;margin:-22px 0 0 -22px;cursor:default}
+.pet svg{width:100%;height:auto;overflow:visible}
+.pet.leaving{opacity:0;transform:translateY(-40px) scale(.6)}
+.pet.sub.leaving{transform:translateY(-20px) scale(.4)}
+.name{font-size:11px;color:var(--ink-soft);margin-top:2px;white-space:nowrap}
+.state{font-size:10px;color:var(--ink-soft);opacity:.8}
+.bubble{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);min-width:60px;max-width:190px;background:var(--bubble);color:var(--bubble-ink);padding:4px 8px;border-radius:10px;font-size:11px;line-height:1.3;opacity:0;transition:opacity .25s;pointer-events:none;z-index:2}
+.bubble.on{opacity:1}
+.bob{animation:bob 1.6s ease-in-out infinite}
+.pet[data-st=sleeping] .bob{animation:breathe 4s ease-in-out infinite}
+.pet[data-st=talking] .bob{animation:bob .5s ease-in-out infinite}
+.pet[data-st=tool] .bob{animation:wiggle .35s ease-in-out infinite}
+.pet[data-st=waiting] .bob{animation:hop .9s ease-in-out infinite}
+.pet[data-st=happy] .bob{animation:hop .5s ease-in-out infinite}
+.pet[data-st=hurt] .bob{animation:shake .25s linear infinite}
+@keyframes bob{50%{transform:translateY(-4px)}}
+@keyframes breathe{50%{transform:scale(1.03,.97)}}
+@keyframes wiggle{25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+@keyframes hop{50%{transform:translateY(-12px)}}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+@media (prefers-reduced-motion:reduce){.bob,.pet{animation:none!important;transition:opacity .01s!important}}
+aside{border-top:1px solid var(--rule);padding:8px 16px;height:90px;overflow:auto;font-size:12px;color:var(--ink-soft)}
+aside b{color:var(--ink)}
+ul{margin:0;padding:0;list-style:none}
+</style>
+</head>
+<body>
+<header><h1>clawsh pet view (prototype)</h1><span id="clock">0s</span><span>scripted fake events, no network</span></header>
+<div id="stage" role="img" aria-label="Pets, one per session"></div>
+<aside><b>Accessible list</b><ul id="list"></ul></aside>
+<script>
+'use strict';
+// ---- seeded generation: same session id -> same pet ----
+function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function rng(seed){let a=seed;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const HOST_COLORS=['#79a8f5','#f0b84a','#c79af0','#6fd3c0','#ff8f7a','#b5d36a'];
+const SYL=['mo','pi','bu','zo','ka','ri','lu','fen','tok','mip','sha','nub'];
+function gen(id,host){
+  const r=rng(hash(id)),pick=a=>a[Math.floor(r()*a.length)];
+  const t={body:pick(['blob','tall','wide']),eyes:pick(['dots','big','sleepy','wink']),ears:pick(['none','cat','horns','antenna']),
+    pattern:pick(['none','spots','stripes','belly']),acc:pick(['none','bow','hat','scarf'])};
+  t.color=HOST_COLORS[hash(host)%HOST_COLORS.length];
+  t.name=pick(SYL)+pick(SYL);t.name=t.name[0].toUpperCase()+t.name.slice(1);
+  return t;
+}
+function shade(hex,k){const n=parseInt(hex.slice(1),16);const f=v=>Math.max(0,Math.min(255,Math.round(v*k)));return'#'+[n>>16,n>>8&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join('')}
+// ---- SVG ----
+function petSVG(t,st,sub){
+  const c=t.color,d=shade(c,.75);
+  const bw=t.body==='wide'?44:t.body==='tall'?32:38,bh=t.body==='tall'?52:t.body==='wide'?34:42;
+  const cx=50,top=62-bh;
+  let s=`<svg viewBox="0 0 100 80" aria-hidden="true"><ellipse cx="50" cy="74" rx="${bw*.8}" ry="4" fill="#0003"/><g class="bob" style="transform-origin:50px 74px">`;
+  if(!sub){
+    if(t.ears==='cat')s+=`<path d="M${cx-bw+6} ${top+8}l4-16 12 8z M${cx+bw-6} ${top+8}l-4-16-12 8z" fill="${d}"/>`;
+    if(t.ears==='horns')s+=`<path d="M${cx-14} ${top+2}q-6-14 2-16 M${cx+14} ${top+2}q6-14-2-16" stroke="${d}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+    if(t.ears==='antenna')s+=`<path d="M${cx} ${top}v-12" stroke="${d}" stroke-width="3"/><circle cx="${cx}" cy="${top-14}" r="4" fill="${st==='thinking'?'#ffd84a':d}"/>`;
+  }
+  s+=`<rect x="${cx-bw}" y="${top}" width="${bw*2}" height="${bh+12}" rx="${bw*.8}" fill="${c}"/>`;
+  if(!sub){
+    if(t.pattern==='spots')s+=`<circle cx="${cx-14}" cy="${top+bh*.7}" r="4" fill="${d}"/><circle cx="${cx+12}" cy="${top+bh*.5}" r="3" fill="${d}"/>`;
+    if(t.pattern==='stripes')s+=`<path d="M${cx-18} ${top+6}h36 M${cx-20} ${top+14}h40" stroke="${d}" stroke-width="3" opacity=".6"/>`;
+    if(t.pattern==='belly')s+=`<ellipse cx="${cx}" cy="${top+bh*.8}" rx="${bw*.55}" ry="${bh*.4}" fill="#fff" opacity=".35"/>`;
+    if(t.acc==='bow')s+=`<path d="M${cx+10} ${top+2}l10-5v10z M${cx+10} ${top+2}l-10-5v10z" fill="#ff6a8a"/>`;
+    if(t.acc==='hat')s+=`<path d="M${cx-12} ${top+1}h24l-12-18z" fill="#4a6cf0"/>`;
+    if(t.acc==='scarf')s+=`<rect x="${cx-bw+4}" y="${top+bh*.55}" width="${bw*2-8}" height="6" rx="3" fill="#e84c4c"/>`;
+  }
+  const ey=top+bh*.4,ex=sub?7:11,er=sub?4:t.eyes==='big'?6:4;
+  const closed=st==='sleeping'||t.eyes==='sleepy'&&st==='idle';
+  const eye=x=>closed?`<path d="M${x-4} ${ey}q4 4 8 0" stroke="#111" stroke-width="2" fill="none"/>`
+    :st==='hurt'?`<path d="M${x-3} ${ey-3}l6 6m0-6l-6 6" stroke="#111" stroke-width="2"/>`
+    :st==='happy'?`<path d="M${x-4} ${ey+2}q4-6 8 0" stroke="#111" stroke-width="2" fill="none"/>`
+    :`<circle cx="${x}" cy="${ey}" r="${er}" fill="#fff"/><circle cx="${x+(st==='thinking'?2:0)}" cy="${ey+(st==='thinking'?-2:0)}" r="${er*.5}" fill="#111"/>`;
+  s+=eye(cx-ex)+eye(cx+ex);
+  if(!sub){
+    const my=ey+13;
+    s+=st==='talking'?`<ellipse cx="${cx}" cy="${my}" rx="5" ry="4" fill="#111"><animate attributeName="ry" values="1;4;1" dur=".4s" repeatCount="indefinite"/></ellipse>`
+      :st==='hurt'?`<path d="M${cx-5} ${my+3}q5-5 10 0" stroke="#111" stroke-width="2" fill="none"/>`
+      :st==='waiting'?`<circle cx="${cx}" cy="${my}" r="3" fill="#111"/>`
+      :`<path d="M${cx-5} ${my}q5 4 10 0" stroke="#111" stroke-width="2" fill="none"/>`;
+    if(st==='waiting')s+=`<text x="${cx+bw-4}" y="${top-2}" font-size="20" font-weight="700" fill="${'#ffd84a'}">!</text>`;
+    if(st==='tool')s+=`<text x="${cx-bw-6}" y="${top+10}" font-size="16">${t.toolIcon||'🔧'}</text>`;
+    if(st==='thinking')s+=`<text x="${cx+bw-6}" y="${top}" font-size="14" fill="${c}">…</text>`;
+    if(st==='sleeping')s+=`<text x="${cx+bw-8}" y="${top+2}" font-size="12" fill="#9bbdb5">z</text>`;
+  }
+  return s+'</g></svg>';
+}
+// ---- world ----
+const stage=document.getElementById('stage'),listEl=document.getElementById('list'),pets=new Map();
+const TOOLS={Read:'📖',Edit:'✏️',Bash:'⌨️',WebFetch:'🌐'};
+function place(p){p.el.style.left=(8+Math.random()*84)+'%';p.el.style.top=(22+Math.random()*60)+'%'}
+function render(p){
+  p.el.dataset.st=p.st;
+  p.el.innerHTML=`<div class="bubble"></div>${petSVG(p.t,p.st,p.sub)}${p.sub?'':`<div class="name">${p.t.name} · ${p.host}</div><div class="state">${p.st}</div>`}`;
+  p.bub=p.el.querySelector('.bubble');
+  if(p.bubText){p.bub.textContent=p.bubText;p.bub.classList.add('on')}
+  refreshList();
+}
+function setState(p,st,extra){if(!p||p.st===st&&!extra)return;p.st=st;if(extra)Object.assign(p.t,extra);render(p)}
+function say(p,text,ms=3500){
+  if(!p||p.sub&&Math.random()<.5)return;
+  const now=performance.now();if(now-p.lastSay<900)return;p.lastSay=now; // rate limit
+  p.bubText=text.length>80?text.slice(0,79)+'…':text;
+  p.bub.textContent=p.bubText;p.bub.classList.add('on');
+  clearTimeout(p.bt);p.bt=setTimeout(()=>{p.bubText='';p.bub.classList.remove('on')},ms);
+}
+function spawn(id,host,parent){
+  if(pets.has(id))return;
+  const sub=!!parent,t=gen(id,host);
+  if(sub){t.color=shade(parent.t.color,1.1)}
+  const el=document.createElement('div');el.className='pet'+(sub?' sub':'');
+  const p={id,host,t,sub,parent,el,st:sub?'idle':'sleeping',lastSay:0,kids:new Set(),bubText:''};
+  if(sub){parent.kids.add(p);el.style.left=parent.el.style.left;el.style.top=parent.el.style.top}
+  else{el.addEventListener('click',()=>{ // real UI: location.hash='#/s/'+host+'/'+id
+    el.querySelector('.state').textContent='→ #/s/'+host+'/'+id})}
+  pets.set(id,p);stage.appendChild(el);render(p);
+  requestAnimationFrame(()=>place(p));
+  return p;
+}
+function leave(id){
+  const p=pets.get(id);if(!p)return;
+  [...p.kids].forEach(k=>leave(k.id));
+  pets.delete(id);if(p.parent)p.parent.kids.delete(p);
+  p.el.classList.add('leaving');setTimeout(()=>{p.el.remove();refreshList()},700);refreshList();
+}
+function refreshList(){
+  listEl.innerHTML='';
+  for(const p of pets.values())if(!p.sub){const li=document.createElement('li');
+    li.textContent=`${p.t.name} (${p.host}/${p.id}): ${p.st}${p.kids.size?`, ${p.kids.size} sub-agent(s)`:''}`;listEl.appendChild(li)}
+}
+// sub-pets orbit their parent
+setInterval(()=>{for(const p of pets.values())if(p.sub&&p.parent&&!p.el.classList.contains('leaving')){
+  const a=Math.random()*6.28,pe=p.parent.el;
+  p.el.style.left=`calc(${pe.style.left} + ${Math.cos(a)*70}px)`;p.el.style.top=`calc(${pe.style.top} + ${Math.sin(a)*40+30}px)`}},2500);
+setInterval(()=>{for(const p of pets.values())if(!p.sub&&p.st!=='sleeping'&&Math.random()<.3)place(p)},4000);
+// ---- hook event -> state (mirrors the table in pet-view.md) ----
+function onHook(e){
+  const p=pets.get(e.sid);
+  switch(e.ev){
+    case'SessionStart':spawn(e.sid,e.host);break;
+    case'SessionEnd':leave(e.sid);break;
+    case'UserPromptSubmit':setState(p,'thinking');say(p,'Hmm, let me think…');break;
+    case'MessageDisplay':setState(p,'talking');say(p,e.text,4000);break;
+    case'PreToolUse':setState(p,'tool',{toolIcon:TOOLS[e.tool]||'🔧'});say(p,e.tool+' '+(e.arg||''),2500);break;
+    case'PostToolUseFailure':setState(p,'hurt');say(p,'Ouch: '+e.tool+' failed',3000);break;
+    case'Notification':setState(p,'waiting');say(p,e.text,6000);break;
+    case'Stop':setState(p,'happy');say(p,e.text,4500);setTimeout(()=>p&&p.st==='happy'&&setState(p,'idle'),4000);break;
+    case'StopFailure':setState(p,'hurt');say(p,'Something broke.',4000);break;
+    case'SubagentStart':spawn(e.aid,p.host,p);break;
+    case'SubagentStop':leave(e.aid);break;
+    case'SubTool':setState(pets.get(e.aid),'tool');break;
+  }
+}
+// ---- scripted stream (seconds) ----
+const S=[
+ [0.5,{ev:'SessionStart',sid:'a1f3',host:'laptop'}],
+ [1.5,{ev:'SessionStart',sid:'b772',host:'devbox'}],
+ [3,{ev:'UserPromptSubmit',sid:'a1f3'}],
+ [5,{ev:'MessageDisplay',sid:'a1f3',text:'I will start by reading the router and its tests.'}],
+ [7,{ev:'PreToolUse',sid:'a1f3',tool:'Read',arg:'router.go'}],
+ [9,{ev:'SubagentStart',sid:'a1f3',aid:'a1f3-s1'}],
+ [9.5,{ev:'SubagentStart',sid:'a1f3',aid:'a1f3-s2'}],
+ [10,{ev:'SubTool',aid:'a1f3-s1'}],
+ [11,{ev:'UserPromptSubmit',sid:'b772'}],
+ [13,{ev:'PreToolUse',sid:'b772',tool:'Bash',arg:'go test ./...'}],
+ [15,{ev:'PostToolUseFailure',sid:'b772',tool:'Bash'}],
+ [17,{ev:'PreToolUse',sid:'a1f3',tool:'Edit',arg:'router.go'}],
+ [19,{ev:'SubagentStop',sid:'a1f3',aid:'a1f3-s1'}],
+ [20,{ev:'Notification',sid:'b772',text:'Claude needs your permission to run rm -rf build'}],
+ [23,{ev:'SessionStart',sid:'c09e',host:'laptop'}],
+ [25,{ev:'SubagentStop',sid:'a1f3',aid:'a1f3-s2'}],
+ [26,{ev:'PreToolUse',sid:'a1f3',tool:'WebFetch',arg:'docs'}],
+ [28,{ev:'Stop',sid:'a1f3',text:'Done! The router now handles trailing slashes.'}],
+ [30,{ev:'UserPromptSubmit',sid:'b772'}],
+ [32,{ev:'MessageDisplay',sid:'b772',text:'Skipping the delete, running the tests instead.'}],
+ [35,{ev:'StopFailure',sid:'b772'}],
+ [38,{ev:'SubagentStart',sid:'c09e',aid:'c09e-s1'}],
+ [42,{ev:'Stop',sid:'b772',text:'All green now.'}],
+ [48,{ev:'SessionEnd',sid:'a1f3'}],
+ [52,{ev:'SessionEnd',sid:'b772'}],
+ [57,{ev:'SessionEnd',sid:'c09e'}]
+];
+const t0=performance.now(),clock=document.getElementById('clock');
+setInterval(()=>{clock.textContent=Math.floor((performance.now()-t0)/1000)+'s'},250);
+S.forEach(([t,e])=>setTimeout(()=>onHook(e),t*1000));
+</script>
+</body>
+</html>
