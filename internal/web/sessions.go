@@ -43,6 +43,22 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, sess)
 }
 
+func (s *Server) recentDirs(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.client(w, r)
+	if !ok {
+		return
+	}
+	out, err := c.RecentDirs(r.Context())
+	if err != nil {
+		relayErr(w, err)
+		return
+	}
+	if out.Dirs == nil {
+		out.Dirs = []string{}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.client(w, r)
 	if !ok {

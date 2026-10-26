@@ -9,6 +9,7 @@
 //	clawsh attach <host>/<id>        attach; Ctrl-] detaches
 //	clawsh kill <host>/<id>
 //	clawsh web                       browser UI for every host and session
+//	clawsh update                    self-update from the latest GitHub release
 package main
 
 import (
@@ -34,6 +35,7 @@ import (
 	"github.com/varogonz95/clawsh/internal/api"
 	"github.com/varogonz95/clawsh/internal/hub"
 	"github.com/varogonz95/clawsh/internal/mcp"
+	"github.com/varogonz95/clawsh/internal/update"
 	"github.com/varogonz95/clawsh/internal/web"
 )
 
@@ -41,6 +43,9 @@ func main() {
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
+	}
+	if exe, err := os.Executable(); err == nil {
+		update.CleanupOld(exe)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
 	var err error
@@ -51,6 +56,8 @@ func main() {
 		err = runToken(args)
 	case "mcp":
 		err = runMCP(args)
+	case "hook":
+		runHook(args) // never fails: it runs inside Claude Code's hooks
 	case "hosts":
 		err = runHosts(args)
 	case "ls", "list":
@@ -63,6 +70,8 @@ func main() {
 		err = runKill(args)
 	case "web":
 		err = runWeb(args)
+	case "update":
+		err = runUpdate(args)
 	case "version":
 		fmt.Println("clawsh", api.Version)
 	case "help", "-h", "--help":
@@ -89,6 +98,10 @@ agent side (run on each machine):
                                      MCP stdio stub run by the Claude Code plugin:
                                      starts an agent if none runs, announces the session
 
+  hook <Event> [--listen :7420] [--token-file path]
+                                     Claude Code hook command: reports the event to the local agent
+                                     (stdin = hook JSON; always exits 0, prints nothing)
+
 hub side (run anywhere; reads hosts.toml):
   hosts                              reachability of every configured agent
   ls [host]                          list sessions
@@ -97,6 +110,9 @@ hub side (run anywhere; reads hosts.toml):
   kill <host>/<id>                   stop and remove a session
   web [--listen 127.0.0.1:7421] [--no-open]
                                      open the browser UI (loopback only)
+
+update [--check] [--version X] [--force]
+                                     replace this binary with the latest release
 
 hub commands accept --config (default: `+hub.DefaultConfigPath()+`)
 `)
@@ -120,8 +136,14 @@ func runAgent(args []string) error {
 		log.Printf("generated new token in %s", *tokenFile)
 		log.Printf("add it to hosts.toml on your hub machine:  token = %q", token)
 	}
+	cfgPath := hub.DefaultConfigPath()
+	if made, err := hub.EnsureLocalHost(cfgPath, *listen, token); err != nil {
+		log.Printf("could not create %s with a local host: %v", cfgPath, err)
+	} else if made {
+		log.Printf("created %s with host %q for this agent", cfgPath, "local")
+	}
 
-	m := agent.NewManager(agent.Options{Command: *claude, Scrollback: *scrollback})
+	m := agent.NewManager(agent.Options{Command: *claude, Scrollback: *scrollback, HistoryFile: agent.DefaultHistoryPath()})
 	srv := &http.Server{
 		Addr:              *listen,
 		Handler:           agent.NewServer(m, token).Handler(),
