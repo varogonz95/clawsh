@@ -30,6 +30,7 @@ token = "paste-token-from-laptop"
 - A trailing `/` on `url` is ignored.
 - `token` is the output of `clawsh token` on that machine.
 - `url` must start with `http://` or `https://`.
+- On start, `clawsh agent` creates this file (mode `0600`) with one host named `local` when it doesn't exist. Its `url` comes from `--listen`: an empty, `0.0.0.0` or `::` host becomes `localhost`, anything else is used as is (`--listen 192.168.1.20:7420` gives `http://192.168.1.20:7420`). An existing file is never modified, so after rotating the token update it yourself. Delete the `local` block if you don't want it.
 - `clawsh web` can edit this file for you (Machines page). When it saves, it re-encodes the file: comments and formatting are lost, and the previous contents are kept in `hosts.toml.bak` (mode `0600`).
 
 A template lives at `hosts.example.toml` in the repo.
