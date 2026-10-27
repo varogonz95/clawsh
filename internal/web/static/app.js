@@ -711,6 +711,60 @@ async function submitNew(form, err, submit, onCreated) {
 
 // ---------- session ----------
 
+// OSC 52 payload is "<targets>;<base64 text>". "?" asks to read the
+// clipboard, which we never allow; an empty text asks to clear it, which we
+// ignore. Oversized payloads are dropped.
+const OSC52_MAX = 1 << 20; // base64 chars, about 768 KiB of text
+function decodeOsc52(data) {
+  const i = data.indexOf(';');
+  if (i < 0) return '';
+  const b64 = data.slice(i + 1);
+  if (!b64 || b64 === '?' || b64.length > OSC52_MAX) return '';
+  try {
+    return new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+  } catch { return ''; }
+}
+
+function legacyCopy(text) {
+  const prev = document.activeElement;
+  const ta = h('textarea', { style: 'position:fixed;opacity:0;top:0;left:0' });
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { /* fall through */ }
+  ta.remove();
+  prev?.focus?.();
+  return ok;
+}
+
+// Browsers may refuse clipboard writes that don't come from a user gesture
+// (the OSC 52 arrives over the websocket) or outside a secure context. Try
+// the async API, then execCommand, and if both fail keep the latest text and
+// write it on the next click or key press in the terminal.
+function copyText(v, text) {
+  const defer = () => {
+    const pending = v.pendingCopy !== undefined;
+    v.pendingCopy = text;
+    if (pending) return;
+    const flush = () => {
+      v.termEl.removeEventListener('pointerup', flush, true);
+      v.termEl.removeEventListener('keydown', flush, true);
+      const t = v.pendingCopy;
+      v.pendingCopy = undefined;
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).catch(() => legacyCopy(t));
+      else legacyCopy(t);
+    };
+    v.termEl.addEventListener('pointerup', flush, true);
+    v.termEl.addEventListener('keydown', flush, true);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => { if (!legacyCopy(text)) defer(); });
+  } else if (!legacyCopy(text)) {
+    defer();
+  }
+}
+
 function openSession(host, id) {
   const term = new Terminal({
     fontFamily: cssVar('--term-font', '"JetBrains Mono", ui-monospace, monospace'),
@@ -772,6 +826,15 @@ function openSession(host, id) {
   term.onData((d) => send(v, enc.encode(d)));
   term.onBinary((d) => send(v, Uint8Array.from(d, (c) => c.charCodeAt(0))));
   term.onResize(({ cols, rows }) => sendResize(v, cols, rows));
+  // Claude Code copies by writing an OSC 52 sequence; xterm.js ignores it.
+  // Copies inside the replayed scrollback are old: don't let them overwrite
+  // the clipboard (see connect).
+  term.parser.registerOscHandler(52, (data) => {
+    if (v.replaying) return true;
+    const text = decodeOsc52(data);
+    if (text) copyText(v, text);
+    return true;
+  });
   v.onWindowResize = () => fit.fit();
   window.addEventListener('resize', v.onWindowResize);
   connect(v);
@@ -860,6 +923,7 @@ function connect(v) {
   ws.binaryType = 'arraybuffer';
   v.ws = ws;
   let established = false;
+  let snapshot = true;
   // The bridge accepts the browser socket before it dials the agent, so open
   // proves nothing. The first message from the agent does.
   ws.onopen = () => sendResize(v, v.term.cols, v.term.rows);
@@ -868,12 +932,22 @@ function connect(v) {
       established = true;
       v.backoff = 1000;
       v.term.reset(); // the agent replays scrollback on every attach; don't show it twice
+      v.replaying = true;
       v.conn = 'connected';
       setBanner(v, null);
       sendResize(v, v.term.cols, v.term.rows);
       renderSessionChrome();
     }
-    if (typeof e.data !== 'string') { v.term.write(new Uint8Array(e.data)); return; }
+    if (typeof e.data !== 'string') {
+      // The agent sends the scrollback snapshot as the first binary frame.
+      // With an empty scrollback the first frame is live output instead; its
+      // copies are dropped too, which only matters for a brand-new session.
+      if (snapshot) {
+        snapshot = false;
+        v.term.write(new Uint8Array(e.data), () => { v.replaying = false; });
+      } else v.term.write(new Uint8Array(e.data));
+      return;
+    }
     let msg;
     try { msg = JSON.parse(e.data); } catch (_) { return; }
     if (msg.type === 'exit') {
