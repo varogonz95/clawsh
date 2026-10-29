@@ -16,7 +16,9 @@ clawsh token
 
 ## 2. Tell the hub about your agents
 
-On the machine you drive from, run `clawsh help` to see the config path (it ends in `clawsh/hosts.toml`), then create that file:
+On the machine running the agent there's nothing to do: if `hosts.toml` doesn't exist yet, the agent creates it with a `local` host (this agent's URL and token), so `clawsh ls`, `clawsh attach local/<id>` and `clawsh web` work right away. An existing file is never changed.
+
+To drive other machines, on the machine you drive from, run `clawsh help` to see the config path (it ends in `clawsh/hosts.toml`), then create that file:
 
 ```toml
 [[host]]

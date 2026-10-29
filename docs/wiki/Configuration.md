@@ -29,12 +29,19 @@ token = "paste-token-from-laptop"
 - `name` and `url` are required; names must be unique. The name is what you type in `clawsh new desk` and `desk/<id>`.
 - A trailing `/` on `url` is ignored.
 - `token` is the output of `clawsh token` on that machine.
+- `url` must start with `http://` or `https://`.
+- On start, `clawsh agent` creates this file (mode `0600`) with one host named `local` when it doesn't exist. Its `url` comes from `--listen`: an empty, `0.0.0.0` or `::` host becomes `localhost`, anything else is used as is (`--listen 192.168.1.20:7420` gives `http://192.168.1.20:7420`). An existing file is never modified, so after rotating the token update it yourself. Delete the `local` block if you don't want it.
+- `clawsh web` can edit this file for you (Machines page). When it saves, it re-encodes the file: comments and formatting are lost, and the previous contents are kept in `hosts.toml.bak` (mode `0600`).
 
 A template lives at `hosts.example.toml` in the repo.
 
 ## `agent.token` (agent)
 
 A 64-character hex token, generated on the agent's first run and written with mode `0600`. Delete it and restart the agent to rotate; then update `hosts.toml` everywhere. Use `--token-file` to keep it elsewhere.
+
+## `recent-dirs.json` (agent)
+
+A JSON array of the last 20 folders the agent started sessions in, most recent first, written with mode `0600` in the config directory. The web UI shows it as recent folders in the new session dialog. Delete the file to clear it. Folders that no longer exist are hidden but stay in the file. Sessions announced through `/v1/external` are not recorded.
 
 ## Session environment
 

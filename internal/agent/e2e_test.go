@@ -5,7 +5,12 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -160,5 +165,143 @@ func TestExternalLease(t *testing.T) {
 	}
 	if s, _ := c.List(ctx); len(s) != 0 {
 		t.Fatalf("externals leaked into sessions: %+v", s)
+	}
+}
+
+func TestHookStatus(t *testing.T) {
+	m := agent.NewManager(agent.Options{Command: "/bin/sh"})
+	defer m.Shutdown()
+	srv := httptest.NewServer(agent.NewServer(m, "k").Handler())
+	defer srv.Close()
+	ctx := context.Background()
+	c := hub.NewClient(hub.Host{Name: "t", URL: srv.URL, Token: "k"})
+
+	sess, err := c.Create(ctx, api.CreateRequest{Dir: "/tmp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sess.Status != api.StatusRunning || sess.Origin != api.OriginManaged {
+		t.Fatalf("created = %+v", sess)
+	}
+	status := func() api.Session {
+		l, err := c.List(ctx)
+		if err != nil || len(l) != 1 {
+			t.Fatalf("list = %+v, %v", l, err)
+		}
+		return l[0]
+	}
+	for _, step := range []struct {
+		event string
+		want  api.Status
+	}{
+		{"UserPromptSubmit", api.StatusWorking},
+		{"Stop", api.StatusIdle},
+		{"Notification", api.StatusNeedsInput},
+		{"SessionStart", api.StatusIdle},
+		{"SessionEnd", api.StatusIdle},
+	} {
+		err := c.Hook(ctx, api.HookEvent{Event: step.event, SessionID: "claude-1", TranscriptPath: "/t.jsonl", ClawshSessionID: sess.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := status(); got.Status != step.want {
+			t.Fatalf("after %s status = %s, want %s", step.event, got.Status, step.want)
+		}
+	}
+	got := status()
+	if got.ClaudeSessionID != "claude-1" || got.Transcript != "/t.jsonl" || got.LastEvent == nil {
+		t.Fatalf("hook fields = %+v", got)
+	}
+
+	// Events without a (known) managed id are accepted and ignored.
+	for _, id := range []string{"", "nope"} {
+		if err := c.Hook(ctx, api.HookEvent{Event: "Stop", ClawshSessionID: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if status().Status != api.StatusIdle {
+		t.Fatal("ignored event changed a session")
+	}
+
+	// Bad JSON is a 400; no token is a 401.
+	req, _ := http.NewRequest("POST", srv.URL+"/v1/hooks", strings.NewReader("{"))
+	req.Header.Set("Authorization", "Bearer k")
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != 400 {
+		t.Fatalf("bad json: %v %v", resp, err)
+	}
+
+	// An exited session stays exited whatever arrives later.
+	if err := c.Hook(ctx, api.HookEvent{Event: "Stop", ClawshSessionID: sess.ID}); err != nil {
+		t.Fatal(err)
+	}
+	conn, err := c.Dial(ctx, sess.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.WriteMessage(websocket.BinaryMessage, []byte("exit 3\n"))
+	deadline := time.Now().Add(5 * time.Second)
+	for status().Status != api.StatusExited && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	conn.Close()
+	if err := c.Hook(ctx, api.HookEvent{Event: "UserPromptSubmit", ClawshSessionID: sess.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if got := status(); got.Status != api.StatusExited || got.ExitCode == nil || *got.ExitCode != 3 {
+		t.Fatalf("after exit = %+v", got)
+  }
+}
+
+func TestRecentDirsEndpoint(t *testing.T) {
+	a, b := t.TempDir(), t.TempDir()
+	m := agent.NewManager(agent.Options{Command: "/bin/sh", HistoryFile: filepath.Join(t.TempDir(), "recent-dirs.json")})
+	defer m.Shutdown()
+	srv := httptest.NewServer(agent.NewServer(m, "secret").Handler())
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := http.Get(srv.URL + "/v1/dirs/recent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no token: %d, want 401", resp.StatusCode)
+	}
+
+	c := hub.NewClient(hub.Host{Name: "t", URL: srv.URL, Token: "secret"})
+	if got, err := c.RecentDirs(ctx); err != nil || got.Dirs == nil || len(got.Dirs) != 0 {
+		t.Fatalf("empty history = %#v, %v", got, err)
+	}
+	for _, d := range []string{a, b} {
+		if _, err := c.Create(ctx, api.CreateRequest{Dir: d}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := c.RecentDirs(ctx)
+	if err != nil || !reflect.DeepEqual(got.Dirs, []string{b, a}) {
+		t.Fatalf("history = %v, %v; want [%s %s]", got.Dirs, err, b, a)
+	}
+	os.RemoveAll(a)
+	if got, _ := c.RecentDirs(ctx); !reflect.DeepEqual(got.Dirs, []string{b}) {
+		t.Fatalf("after delete = %v", got.Dirs)
+	}
+
+	// History disabled: empty list, not null.
+	m2 := agent.NewManager(agent.Options{Command: "/bin/sh"})
+	defer m2.Shutdown()
+	srv2 := httptest.NewServer(agent.NewServer(m2, "secret").Handler())
+	defer srv2.Close()
+	req, _ := http.NewRequest(http.MethodGet, srv2.URL+"/v1/dirs/recent", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	resp2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	body, _ := io.ReadAll(resp2.Body)
+	if strings.TrimSpace(string(body)) != `{"dirs":[]}` {
+		t.Fatalf("disabled body = %s", body)
 	}
 }

@@ -102,7 +102,7 @@ func (b *broadcaster) poll(ctx context.Context) {
 
 func (b *broadcaster) publish(ctx context.Context) {
 	hosts, cfgErr := b.hosts.State()
-	ov := api.Overview{ConfigPath: b.hosts.path, ConfigError: cfgErr, Hosts: hub.Overview(ctx, hosts)}
+	ov := api.Overview{Version: api.Version, ConfigPath: b.hosts.path, ConfigError: cfgErr, Hosts: hub.Overview(ctx, hosts)}
 	data, err := json.Marshal(ov)
 	if err != nil {
 		log.Printf("clawsh web: encode overview: %v", err)
