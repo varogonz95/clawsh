@@ -791,7 +791,6 @@ if (document.documentElement.dataset.mode === 'system') {
     if (state.view && state.view.term) state.view.term.options.theme = termTheme();
   });
 }
-}
 
 function openSession(host, id) {
   const term = new Terminal({
