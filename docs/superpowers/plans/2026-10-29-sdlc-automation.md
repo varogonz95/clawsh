@@ -48,7 +48,7 @@ test-first, diff coverage, amendments, memory system).
 | Default budgets per stage     | planning 400k tokens / 30 min; implementation 600k / 45 min; each reviewer 80k / 10 min; testing 300k / 30 min; fix round 150k / 15 min |
 | Follow-up issues per task     | at most 3                                                                            |
 | Lesson expiry                 | 90 days unless re-confirmed; promoted to a `CLAUDE.md` proposal after 3 confirmations |
-| Claim label                   | stage labels replace `agent:on_it`                                                   |
+| Claim label                   | `stage:*` labels; the unused GitHub label `agent:on_it` is deleted                   |
 
 ## Prerequisites (maintainer, manual)
 
