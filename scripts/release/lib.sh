@@ -1,4 +1,4 @@
-# Helpers shared by release-prepare.yml and release-hotfix.yml (bash, sourced).
+# Helpers shared by release-cut.yml and release-hotfix.yml (bash, sourced).
 # The workflows copy this file to $RUNNER_TEMP right after checking out main,
 # because the commits they later check out may predate it.
 
@@ -22,20 +22,14 @@ highest_stable() {
   git tag -l "${1:-v*}" | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true
 }
 
-# bump_plugin VERSION: set the top-level "version" of plugin.json, keeping the
-# file's hand-formatted layout. Only the line indented as a top-level key is
-# touched, and anything but that one line changing is an error.
-bump_plugin() {
-  local f=plugin/.claude-plugin/plugin.json
-  sed -i -E "s/^(  \"version\": \")[^\"]*(\")/\1$1\2/" "$f"
-  if ! jq -e --arg v "$1" '.version == $v' "$f" >/dev/null; then
-    echo "::error file=$f::could not set the top-level version to $1"
-    return 1
-  fi
-  local n
-  n=$(git diff --numstat -- "$f" | cut -f1,2)
-  if [[ -n $n && $n != $'1\t1' ]]; then
-    echo "::error file=$f::setting the version changed more than one line"
-    return 1
-  fi
+# next_version LAST BUMP: LAST (x.y.z) bumped by patch, minor or major.
+next_version() {
+  local maj min pat
+  IFS=. read -r maj min pat <<< "$(core "$1")"
+  case $2 in
+    major) echo "$((maj + 1)).0.0" ;;
+    minor) echo "$maj.$((min + 1)).0" ;;
+    patch) echo "$maj.$min.$((pat + 1))" ;;
+    *) echo "::error::unknown bump '$2'" >&2; return 1 ;;
+  esac
 }

@@ -11,6 +11,10 @@ Each session has two loops:
 
 A session lives until its process exits or you `kill` it, regardless of whether anyone is attached. Exited sessions stay in `ls` as `exited(code)` until killed.
 
+## Status
+
+Claude Code hooks run `clawsh hook <Event>`, which posts to the agent's `POST /v1/hooks`. The agent maps the event to `working`, `idle` or `needs_input` on the session named by `CLAWSH_SESSION_ID`. Before the first hook a live session is `running`.
+
 ## Attaching
 
 `clawsh attach` opens a WebSocket to the agent, puts your terminal in raw mode, and then:

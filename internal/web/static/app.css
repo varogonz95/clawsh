@@ -111,6 +111,12 @@ h1, h2 { margin: 0; letter-spacing: -0.02em; }
 .pill.warn { color: var(--warn-ink); background: var(--warn-bg); }
 .row { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-top: 1px solid var(--rule); min-height: 44px; color: inherit; text-decoration: none; }
 a.row:hover { background: var(--raised); color: inherit; }
+.row.split { padding: 0 20px 0 0; }
+.row.split:hover { background: var(--raised); }
+.row-link { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; padding: 14px 0 14px 20px; color: inherit; text-decoration: none; }
+.row-link:hover { color: inherit; }
+.icon-btn { padding-left: 8px; padding-right: 8px; flex: none; }
+.icon-btn .icon { display: inline-flex; width: 18px; height: 18px; }
 .row-title { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .mono { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewers { display: inline-flex; align-items: center; gap: 4px; }
@@ -132,6 +138,25 @@ a.row:hover { background: var(--raised); color: inherit; }
 
 /* session */
 .session { max-width: 1200px; margin: 0 auto; padding: 24px 40px 24px; display: flex; flex-direction: column; gap: 16px; height: calc(100vh - 73px); min-height: 480px; }
+/* sessions panel: a sidebar next to the terminal; under 900px it overlays it */
+.session-wrap { max-width: 1480px; margin: 0 auto; padding: 24px 40px; display: flex; gap: 20px; height: calc(100vh - 73px); min-height: 480px; }
+.session-wrap > .session { flex: 1 1 auto; min-width: 0; max-width: none; margin: 0; padding: 0; height: auto; min-height: 0; }
+.sessions-panel { flex: 0 0 264px; width: 264px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.sessions-panel.collapsed { flex-basis: 44px; width: 44px; }
+.panel-head { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.panel-title { font-weight: 600; color: var(--ink-2); }
+.icon-btn { width: 44px; min-height: 44px; padding: 0; flex-shrink: 0; }
+.icon-btn .icon { width: 18px; height: 18px; }
+.panel-body { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0; }
+.sessions-panel.collapsed .panel-body, .sessions-panel.collapsed .panel-title { display: none; }
+.panel-group { display: flex; flex-direction: column; gap: 4px; }
+.panel-host { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.panel-host .tile { width: 28px; height: 28px; border-radius: 8px; font-size: 14px; }
+.panel-item { display: block; padding: 8px 12px; border-radius: 8px; border: 1px solid transparent; color: var(--ink); text-decoration: none; min-height: 44px; }
+.panel-item:hover { background: var(--raised); color: var(--ink); }
+.panel-item.current { background: var(--panel); border-color: var(--accent); }
+.panel-item .row-title { font-size: 15px; }
+.panel-item .small { display: block; }
 .session-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .session-head h1 { font-size: 30px; font-weight: 700; line-height: 1.15; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px; color: var(--ink-2); }
@@ -153,6 +178,8 @@ a.row:hover { background: var(--raised); color: inherit; }
 .session > p { margin: 0; }
 .banner { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px; border-radius: 10px; background: var(--raised); border: 1px solid var(--rule-strong); }
 .banner.config-error { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-bg); margin-bottom: 24px; overflow-wrap: anywhere; }
+.banner.updated { position: sticky; top: 0; z-index: 50; border-radius: 0; color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-bg); }
+.warn-text { color: var(--warn-ink); }
 .first-run .banner.config-error { margin-bottom: 0; }
 
 /* dialogs */
@@ -174,6 +201,13 @@ legend { padding: 0; margin-bottom: 10px; font-weight: 600; }
 .field label { font-weight: 600; }
 .input { min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--rule-strong); background: var(--ground); color: var(--ink); font: inherit; }
 .input.mono { font: 14px var(--mono); }
+.recent { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.recent[hidden] { display: none; }
+.recent-item { max-width: 100%; min-height: 32px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 8px; background: transparent; color: var(--ink-2); font: 13px var(--mono); cursor: pointer; text-align: left; display: flex; }
+.recent-item:hover { border-color: var(--accent); color: var(--ink); }
+/* Long paths: keep the end, ellipsis at the start. */
+.recent-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; unicode-bidi: plaintext; }
+.recent-toggle { background: none; border: 0; padding: 4px 0; color: var(--ink-2); text-decoration: underline; cursor: pointer; font: inherit; }
 details { border-top: 1px solid var(--rule); padding-top: 16px; }
 summary { cursor: pointer; font-weight: 600; color: var(--ink-2); min-height: 32px; }
 details .field { margin-top: 12px; }
@@ -184,10 +218,17 @@ details .field { margin-top: 12px; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 12px 18px; border-radius: 10px; background: var(--raised); border: 1px solid var(--danger-line); color: var(--ink); z-index: 10; }
 
 @media (max-width: 640px) {
-  .topbar-in, .page, .session { padding-left: 16px; padding-right: 16px; }
+  .topbar-in, .page, .session-wrap { padding-left: 16px; padding-right: 16px; }
   .page-head h1, .first-run h1 { font-size: 32px; }
   .cards { grid-template-columns: 1fr; }
   .dialog-body { padding: 24px; }
+}
+@media (max-width: 900px) {
+  .session-wrap { flex-direction: column; gap: 12px; }
+  .sessions-panel, .sessions-panel.collapsed { flex: 0 0 auto; width: auto; align-self: flex-start; position: relative; }
+  .sessions-panel:not(.collapsed) .panel-title, .sessions-panel.collapsed .panel-title { display: inline; }
+  .sessions-panel .panel-body { position: absolute; top: 100%; left: 0; width: min(320px, calc(100vw - 32px)); max-height: 60vh; z-index: 6; padding: 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--rule-strong); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5); }
+  .sessions-panel.collapsed .panel-body { display: none; }
 }
 /* On a phone the top bar keeps only the + of "New session"; the label stays for screen readers. */
 @media (max-width: 480px) {

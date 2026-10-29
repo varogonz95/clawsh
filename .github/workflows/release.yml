@@ -26,19 +26,12 @@ jobs:
       contents: write
     outputs:
       npm_tag: ${{ steps.channel.outputs.npm_tag }}
+      latest: ${{ steps.channel.outputs.latest }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
-      - name: Check plugin version
-        run: |
-          plugin=$(jq -r .version plugin/.claude-plugin/plugin.json)
-          if [[ $plugin != "${GITHUB_REF_NAME#v}" ]]; then
-            echo "::error file=plugin/.claude-plugin/plugin.json::version is $plugin, tag is $GITHUB_REF_NAME; bump it before tagging"
-            exit 1
-          fi
 
       # Where this version goes. A release on an older line (a hotfix on
       # release/0.1 after 0.2.0) must not take GitHub's "Latest", npm's latest or
@@ -123,8 +116,22 @@ jobs:
           gh release create "$GITHUB_REF_NAME" out/* \
             --verify-tag --generate-notes --title "clawsh ${GITHUB_REF_NAME}" "${flags[@]}"
 
+  # The site's header shows the newest release, so rebuild it from main. A
+  # workflow_dispatch is one of the events GITHUB_TOKEN may start.
+  site:
+    needs: release
+    if: needs.release.outputs.latest == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+
   # The same binaries as the GitHub release, as npm packages: one per platform
-  # (clawsh-<os>-<cpu>) plus the "clawsh" launcher that depends on them.
+  # (clawsh-<os>-<cpu>) plus the "clawsh-cli" launcher that depends on them (npm
+  # doesn't allow the name "clawsh"; the command it installs is still clawsh).
   npm:
     needs: release
     runs-on: ubuntu-latest

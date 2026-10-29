@@ -27,6 +27,10 @@ type Session struct {
 	readerDone bool // PTY output finished; no more data will arrive
 	exited     bool
 	exitCode   int
+	status     api.Status // hook-driven; empty until the first hook
+	claudeID   string
+	transcript string
+	lastEvent  time.Time
 
 	done chan struct{} // closed once the process has exited and the PTY is closed
 }
@@ -148,6 +152,27 @@ func (s *Session) ExitCode() (int, bool) {
 	return s.exitCode, s.exited
 }
 
+// ApplyHook records a hook event. The exit state always wins.
+func (s *Session) ApplyHook(ev api.HookEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch ev.Event {
+	case "UserPromptSubmit":
+		s.status = api.StatusWorking
+	case "Stop", "SessionStart":
+		s.status = api.StatusIdle
+	case "Notification":
+		s.status = api.StatusNeedsInput
+	}
+	if ev.SessionID != "" {
+		s.claudeID = ev.SessionID
+	}
+	if ev.TranscriptPath != "" {
+		s.transcript = ev.TranscriptPath
+	}
+	s.lastEvent = time.Now()
+}
+
 func (s *Session) Info() api.Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -156,6 +181,14 @@ func (s *Session) Info() api.Session {
 		Pid: s.p.Pid(), Created: s.Created,
 		Status:  api.StatusRunning,
 		Viewers: len(s.subs),
+		Origin:  api.OriginManaged, ClaudeSessionID: s.claudeID, Transcript: s.transcript,
+	}
+	if s.status != "" {
+		info.Status = s.status
+	}
+	if !s.lastEvent.IsZero() {
+		t := s.lastEvent
+		info.LastEvent = &t
 	}
 	if s.exited {
 		code := s.exitCode

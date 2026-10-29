@@ -30,16 +30,20 @@ Run it again to upgrade. Settings:
 
 With `curl … | sh`, set them on the `sh` side: `curl -fsSL …/install.sh | CLAWSH_VERSION=0.1.0 sh`. In PowerShell, set `$env:CLAWSH_VERSION = '0.1.0'` first. To read the script before running it, open [install.sh](https://varogonz95.github.io/clawsh/install.sh) or [install.ps1](https://varogonz95.github.io/clawsh/install.ps1); the source is in `site/` in the repository.
 
+## Updating
+
+`clawsh update` replaces the binary with the latest release (`clawsh update --check` only looks); see [Commands](Commands.md#clawsh-update). With npm, run `npm install -g clawsh-cli@latest` instead.
+
 ## npm
 
 With Node 18 or newer:
 
 ```sh
-npm i -g clawsh      # installs the clawsh command
-npx clawsh ls        # or run it without installing
+npm i -g clawsh-cli      # installs the clawsh command
+npx clawsh-cli ls        # or run it without installing
 ```
 
-The `clawsh` package is a small launcher. npm also installs the one platform package that matches your machine (`clawsh-linux-x64`, `clawsh-darwin-arm64`, `clawsh-win32-x64`, ...), which holds the real binary. If that package was skipped (pnpm or bun blocking it, `--omit=optional`, a lockfile made on another OS), the first run downloads it from your npm registry, checks it against the registry's sha512, and caches it.
+The `clawsh-cli` package is a small launcher (npm doesn't allow the name `clawsh`; the command it installs is still `clawsh`). npm also installs the one platform package that matches your machine (`clawsh-linux-x64`, `clawsh-darwin-arm64`, `clawsh-win32-x64`, ...), which holds the real binary. If that package was skipped (pnpm or bun blocking it, `--omit=optional`, a lockfile made on another OS), the first run downloads it from your npm registry, checks it against the registry's sha512, and caches it.
 
 Behind a proxy or a registry that blocks the download, point the launcher at a binary you already have: `CLAWSH_BINARY_PATH=/path/to/clawsh`. On Node 24+, `NODE_USE_ENV_PROXY=1` makes the download honor `HTTPS_PROXY`. Downloaded binaries are cached in `~/.cache/clawsh` (`$XDG_CACHE_HOME/clawsh`), `~/Library/Caches/clawsh` on macOS or `%LOCALAPPDATA%\clawsh\cache` on Windows; set `CLAWSH_CACHE_DIR` to use another directory.
 

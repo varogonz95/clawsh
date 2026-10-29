@@ -43,6 +43,12 @@ func (c *Client) Kill(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/sessions/"+url.PathEscape(id), nil, nil)
 }
 
+// RecentDirs lists the folders recently used for sessions on the agent.
+func (c *Client) RecentDirs(ctx context.Context) (api.RecentDirs, error) {
+	var out api.RecentDirs
+	return out, c.do(ctx, http.MethodGet, "/v1/dirs/recent", nil, &out)
+}
+
 func (c *Client) Externals(ctx context.Context) ([]api.External, error) {
 	var out []api.External
 	return out, c.do(ctx, http.MethodGet, "/v1/external", nil, &out)
@@ -56,6 +62,11 @@ func (c *Client) Announce(ctx context.Context, id string, req api.AnnounceReques
 
 func (c *Client) Withdraw(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/external/"+url.PathEscape(id), nil, nil)
+}
+
+// Hook posts a Claude Code hook event to the agent.
+func (c *Client) Hook(ctx context.Context, ev api.HookEvent) error {
+	return c.do(ctx, http.MethodPost, "/v1/hooks", ev, nil)
 }
 
 // Dial opens the attach WebSocket for a session.

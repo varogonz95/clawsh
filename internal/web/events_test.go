@@ -22,6 +22,9 @@ func TestOverviewOnlineAndOffline(t *testing.T) {
 
 	ov := next(t, subscribe(t, login(t, base), base))
 
+	if ov.Version != api.Version {
+		t.Errorf("version = %q, want %q", ov.Version, api.Version)
+	}
 	if ov.ConfigPath != cfg {
 		t.Errorf("config_path = %q, want %q", ov.ConfigPath, cfg)
 	}
