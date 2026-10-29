@@ -789,6 +789,7 @@ function termTheme() {
 if (document.documentElement.dataset.mode === 'system') {
   window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
     if (state.view && state.view.term) state.view.term.options.theme = termTheme();
+    render(); // host tile colours are inlined at render time
   });
 }
 
