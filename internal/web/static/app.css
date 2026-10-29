@@ -275,7 +275,7 @@ details .field { margin-top: 12px; }
   --term-fg: #1d3a3c;
   --term-cursor: #d9442c;
   --term-selection: #bfe3da;
-  --term-ansi: #1d3a3c, #c4473d, #1f8a55, #9a6a00, #2f6fdb, #8a4fd0, #0f8f7c, #cddad6, #4f6f6b, #e0604f, #2aa86a, #b8860b, #4f8df0, #a672e6, #25a893, #ffffff;
+  --term-ansi: #1d3a3c, #c4473d, #1f8a55, #9a6a00, #2f6fdb, #8a4fd0, #0f8f7c, #6b8480, #4f6f6b, #e0604f, #238f5c, #b8860b, #4f8df0, #a672e6, #1d8f7d, #2f4b48;
 }
 
 /* VS Code Dark Modern (microsoft/vscode extensions/theme-defaults, MIT) */
@@ -308,7 +308,7 @@ details .field { margin-top: 12px; }
   --term-fg: #cccccc;
   --term-cursor: #ffffff;
   --term-selection: #264f78;
-  --term-ansi: #000000, #cd3131, #0dbc79, #e5e510, #2472c8, #bc3fbc, #11a8cd, #e5e5e5, #666666, #f14c4c, #23d18b, #f5f543, #3b8eea, #d670d6, #29b8db, #e5e5e5;
+  --term-ansi: #000000, #cd3131, #0dbc79, #e5e510, #2472c8, #bc3fbc, #11a8cd, #e5e5e5, #7a7a7a, #f14c4c, #23d18b, #f5f543, #3b8eea, #d670d6, #29b8db, #e5e5e5;
 }
 
 /* VS Code Light Modern (microsoft/vscode extensions/theme-defaults, MIT) */
@@ -341,7 +341,7 @@ details .field { margin-top: 12px; }
   --term-fg: #3b3b3b;
   --term-cursor: #005fb8;
   --term-selection: #add6ff;
-  --term-ansi: #000000, #cd3131, #00bc00, #949800, #0451a5, #bc05bc, #0598bc, #555555, #666666, #cd3131, #14ce14, #b5ba00, #0451a5, #bc05bc, #0598bc, #a5a5a5;
+  --term-ansi: #000000, #cd3131, #008a00, #949800, #0451a5, #bc05bc, #0598bc, #555555, #666666, #cd3131, #0f8f0f, #8a8d00, #0451a5, #bc05bc, #0598bc, #767676;
 }
 
 /* Ayu Dark (ayu-theme/ayu-colors, MIT) */
@@ -407,7 +407,7 @@ details .field { margin-top: 12px; }
   --term-fg: #5c6166;
   --term-cursor: #ff9940;
   --term-selection: #d1e4f4;
-  --term-ansi: #000000, #ea6c6d, #6cbf43, #eca944, #3199e1, #9e75c7, #46ba94, #bababa, #686868, #f07171, #86b300, #f2ae49, #399ee6, #a37acc, #4cbf99, #d3d3d3;
+  --term-ansi: #000000, #d04a4a, #4c9a1f, #a8730a, #3199e1, #9e75c7, #2a9473, #7a7f85, #686868, #e65a5a, #628a00, #b57a10, #2f86c8, #a37acc, #2f9f78, #5c6166;
 }
 
 @media (prefers-color-scheme: light) {
@@ -440,7 +440,7 @@ details .field { margin-top: 12px; }
     --term-fg: #1d3a3c;
     --term-cursor: #d9442c;
     --term-selection: #bfe3da;
-    --term-ansi: #1d3a3c, #c4473d, #1f8a55, #9a6a00, #2f6fdb, #8a4fd0, #0f8f7c, #cddad6, #4f6f6b, #e0604f, #2aa86a, #b8860b, #4f8df0, #a672e6, #25a893, #ffffff;
+    --term-ansi: #1d3a3c, #c4473d, #1f8a55, #9a6a00, #2f6fdb, #8a4fd0, #0f8f7c, #6b8480, #4f6f6b, #e0604f, #238f5c, #b8860b, #4f8df0, #a672e6, #1d8f7d, #2f4b48;
   }
 }
 
@@ -474,7 +474,7 @@ details .field { margin-top: 12px; }
     --term-fg: #cccccc;
     --term-cursor: #ffffff;
     --term-selection: #264f78;
-    --term-ansi: #000000, #cd3131, #0dbc79, #e5e510, #2472c8, #bc3fbc, #11a8cd, #e5e5e5, #666666, #f14c4c, #23d18b, #f5f543, #3b8eea, #d670d6, #29b8db, #e5e5e5;
+    --term-ansi: #000000, #cd3131, #0dbc79, #e5e510, #2472c8, #bc3fbc, #11a8cd, #e5e5e5, #7a7a7a, #f14c4c, #23d18b, #f5f543, #3b8eea, #d670d6, #29b8db, #e5e5e5;
   }
 }
 
@@ -508,7 +508,7 @@ details .field { margin-top: 12px; }
     --term-fg: #3b3b3b;
     --term-cursor: #005fb8;
     --term-selection: #add6ff;
-    --term-ansi: #000000, #cd3131, #00bc00, #949800, #0451a5, #bc05bc, #0598bc, #555555, #666666, #cd3131, #14ce14, #b5ba00, #0451a5, #bc05bc, #0598bc, #a5a5a5;
+    --term-ansi: #000000, #cd3131, #008a00, #949800, #0451a5, #bc05bc, #0598bc, #555555, #666666, #cd3131, #0f8f0f, #8a8d00, #0451a5, #bc05bc, #0598bc, #767676;
   }
 }
 
@@ -576,6 +576,6 @@ details .field { margin-top: 12px; }
     --term-fg: #5c6166;
     --term-cursor: #ff9940;
     --term-selection: #d1e4f4;
-    --term-ansi: #000000, #ea6c6d, #6cbf43, #eca944, #3199e1, #9e75c7, #46ba94, #bababa, #686868, #f07171, #86b300, #f2ae49, #399ee6, #a37acc, #4cbf99, #d3d3d3;
+    --term-ansi: #000000, #d04a4a, #4c9a1f, #a8730a, #3199e1, #9e75c7, #2a9473, #7a7f85, #686868, #e65a5a, #628a00, #b57a10, #2f86c8, #a37acc, #2f9f78, #5c6166;
   }
 }

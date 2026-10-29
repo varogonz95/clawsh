@@ -124,6 +124,16 @@ func TestThemeCSS(t *testing.T) {
 			if n := len(strings.Split(v["term-ansi"], ",")); n != 16 {
 				t.Errorf("%s: --term-ansi has %d colours", sel, n)
 			}
+			// Every ANSI colour must stay readable on the terminal background.
+			// Black (slot 0) on a dark background is the usual exception.
+			for i, c := range strings.Split(v["term-ansi"], ",") {
+				if i == 0 && mode == "dark" {
+					continue
+				}
+				if r := contrast(strings.TrimSpace(c), v["term-bg"]); r < 3 {
+					t.Errorf("%s: ANSI colour %d (%s) on --term-bg contrast %.2f < 3", sel, i, strings.TrimSpace(c), r)
+				}
+			}
 			for _, bg := range []string{"ground", "panel"} {
 				for _, fg := range []string{"ink", "ink-2", "ink-soft", "link"} {
 					if c := contrast(v[fg], v[bg]); c < 4.5 {
