@@ -141,7 +141,8 @@ Useful on every PR on their own, before any agent exists.
 - [ ] `scripts/pipeline/state.py`: read and write the `pipeline-state` branch through a temporary `git worktree`;
       task record (stage, plan version, review round, testing cycle, fix round, budgets used, links), plan
       versions, `findings.jsonl`, handoffs, `acceptance.json`. Writes validate against schemas and retry on
-      non-fast-forward (fetch, rebase, push, max 3).
+      non-fast-forward (fetch, rebase, push, max 3). A claim is compare-and-swap: after a rejected push it
+      re-reads the task record and gives up if another run claimed it meanwhile.
 - [ ] Creates the orphan branch on first use.
 - **Done when:** tests run against a local bare repo, including two concurrent writers to different tasks.
 
@@ -197,16 +198,22 @@ Useful on every PR on their own, before any agent exists.
 - [ ] `scripts/pipeline/orchestrator.py`: pure `next(state, event) -> (state, actions)`; actions are label
       changes, status comment upsert, stage runs, stop. Covers every edge of the flow diagram, counters (review
       round per cycle, testing cycle per issue across re-plans, fix round per PR), trust filter, stop summary
-      plus `needs_human`.
+      plus `needs_human`. Stages chain inside one run; the orchestrator never waits for its own label events.
+- [ ] Claim inside the per-issue concurrency group from the task record (no stage running), not from labels.
+- [ ] `reconcile()`: for each open task record, handle comments, labels and PR checks newer than the last
+      processed ids; runs at the end of every run and on schedule.
 - [ ] `scripts/pipeline/ghapi.py`: REST helpers (labels, comments, PRs) with the bot token.
-- **Done when:** table test per diagram edge and per stop condition.
+- **Done when:** table test per diagram edge and per stop condition; tests for a dropped `/approve` picked up
+  by reconcile and for two runs racing for the same claim.
 
 ### Task 4.2: Workflow
 
-- [ ] `.github/workflows/pipeline.yml`: triggers `issues: labeled`, `issue_comment: created`,
-      `pull_request_review: submitted`, `workflow_run` of `ci` (completed); `concurrency:
-      pipeline-issue-<n>` without cancel; trust filter on `github.actor`; same-repo check for PR events;
-      `PIPELINE_DRY_RUN` input/variable.
+- [ ] `.github/workflows/pipeline.yml`: the triggers in the **Triggers** table of `docs/sdlc-pipeline.md`
+      (`issues: opened, labeled`, `issue_comment: created`, `pull_request_review: submitted`, `workflow_run` of
+      `ci` completed, `schedule` every 30 minutes); a first step resolves the issue number (from the event, or
+      for `workflow_run` from the head branch `<type>/<issue>/<title>`, falling back to the PR's `Closes #<n>`);
+      `concurrency: pipeline-issue-<n>` without cancel; trust filter on the actor (bot events ignored);
+      same-repo check for PR events; `PIPELINE_DRY_RUN` variable.
 - **Done when:** dry run on a test issue posts the status comment and the stage it would run.
 
 ### Task 4.3: Planning stage
@@ -273,5 +280,7 @@ ordinary sessions; Phase 4 tasks can start dogfooding from Task 4.2's dry run.
 - **Actions and API cost:** budgets plus dry-run measurements before go-live.
 - **`claude-code-action` input changes:** pinned by SHA; upgrades are their own PR.
 - **`pipeline-state` write races:** per-issue concurrency group plus rebase-retry in `state.py`.
+- **Dropped events:** GitHub keeps one pending run per concurrency group; reconcile at the end of every run and
+  on schedule.
 - **Prompt injection through issue text:** trust filter on actors; agents treat other text as data.
 - **Flaky e2e tests causing loops:** a failure that doesn't reproduce on one re-run is reported, not looped on.

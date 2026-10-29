@@ -52,7 +52,8 @@ flowchart TD
 ### 1–2. Input and refinement
 
 Follows [`issue-refinement.md`](issue-refinement.md). Open questions are posted on the issue and the issue
-waits on `needs_human` until they are answered; `agent-ready` is the only trigger for planning.
+waits on `needs_human` until they are answered. When the refinement agent marks an issue `agent-ready`, the
+orchestrator moves straight on to Planning in the same run (see **Triggers**).
 
 ### 3. Planning
 
@@ -154,9 +155,37 @@ An issue carries at most one `stage:` label, and never one together with `needs_
 round counters, and links to the plan, findings and PR. The comment is a view: the counters themselves live in
 the task record, written only by the orchestrator.
 
+## Triggers
+
+The orchestrator moves an issue from stage to stage itself, inside its own run: it doesn't wait for its own
+label changes to come back as events. Labels and the status comment are a view of the task record, not a signal.
+Only these events start a run:
+
+| Event                                                    | From                    | Starts                        |
+| -------------------------------------------------------- | ----------------------- | ----------------------------- |
+| issue opened or labelled `needs_refinement`              | maintainer              | Refinement                    |
+| issue labelled `agent-ready`                             | maintainer              | Planning (e.g. after a stop)  |
+| `/approve` or `/changes <text>` comment                  | maintainer              | Implementation or re-planning |
+| review or comment on the pipeline's PR                   | maintainer              | PR fix loop or Planning       |
+| `workflow_run` of `ci` completed on the pipeline's PR    | any (the run's result)  | PR fix loop                   |
+| schedule, every 30 minutes                               | GitHub                  | reconcile                     |
+
+`workflow_run` carries no issue number: the orchestrator reads it from the head branch name
+(`<type>/<issue>/<title>`), falling back to the PR's `Closes #<n>`.
+
+**Reconcile.** GitHub keeps one pending run per concurrency group and cancels older pending ones, so an event can
+be dropped while a run is busy. So every run ends with a reconcile, and the scheduled run is only a reconcile:
+for each issue with an open task record, it compares the comments, labels and PR checks newer than what the task
+record last processed, and handles anything missed. A dropped `/approve` is picked up at the latest by the next scheduled run.
+Issues the refinement agent creates (sub-issues of a split) get a task record when created, so reconcile picks
+up the ones marked `agent-ready`.
+
 ## Concurrency
 
-- An agent claims an issue by setting its `stage:` label; an issue that already has one is skipped.
+- Every run for an issue is in the concurrency group `pipeline-issue-<n>`, without cancelling the running one.
+- The claim is the orchestrator's: it starts a stage only after recording the claim in the task record. That
+  write is a push to `pipeline-state`, so of two runs racing (a per-issue run and the scheduled reconcile), only
+  one push succeeds; the other re-reads and backs off. The `stage:` label shows the claim; it isn't the lock.
 - Plans list the files they touch. Issues whose plans touch the same files run one after the other.
 - Dependencies stay as in the Definition of Ready: a blocked issue isn't planned.
 
@@ -167,7 +196,7 @@ the summary saying which budget ran out.
 
 ## Trust
 
-- Only the maintainer's issues, comments and reviews trigger a run, plus CI results (`workflow_run`); the bot
-  account's own comments, reviews and label changes never do (they would loop). Text from anyone else is data,
-  never instructions.
+- Only the events in **Triggers** start a run. The bot account's own comments, reviews and label changes never
+  do (they would loop); the orchestrator advances stages itself instead. Text from anyone other than the
+  maintainer is data, never instructions.
 - Agents never get release secrets (`RELEASE_TOKEN`) or the `releases` environment.
