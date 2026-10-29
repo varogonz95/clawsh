@@ -449,6 +449,7 @@ func runWeb(args []string) error {
 	theme := fs.String("theme", web.DefaultTheme, "web UI theme: clawsh, vscode or ayu")
 	appearance := fs.String("appearance", web.DefaultAppearance, "web UI appearance: dark, light or system")
 	parseInterspersed(fs, args)
+	// web.New checks again; failing here is before the listener is opened.
 	if _, _, err := web.ResolveLook(*theme, *appearance); err != nil {
 		return err
 	}

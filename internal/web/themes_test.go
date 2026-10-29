@@ -134,3 +134,39 @@ func TestThemeCSS(t *testing.T) {
 		}
 	}
 }
+
+// The data-mode="system" blocks are copies of the dark/light ones inside
+// prefers-color-scheme queries; they must not drift from the explicit blocks.
+func TestSystemBlocksMatch(t *testing.T) {
+	b, err := staticFiles.ReadFile("static/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(b)
+	re := regexp.MustCompile(`@media \(prefers-color-scheme: (\w+)\) \{\s*(:root\[data-theme="(\w+)"\]\[data-mode="system"\]) \{`)
+	found := map[string]bool{}
+	for _, loc := range re.FindAllStringSubmatchIndex(css, -1) {
+		mode, theme := css[loc[2]:loc[3]], css[loc[6]:loc[7]]
+		found[theme+"/"+mode] = true
+		got := cssBlock(t, css[loc[4]:], css[loc[4]:loc[5]])
+		want := cssBlock(t, css, `:root[data-theme="`+theme+`"][data-mode="`+mode+`"]`)
+		if len(want) == 0 || len(got) != len(want) {
+			t.Errorf("%s/%s: system block has %d tokens, explicit has %d", theme, mode, len(got), len(want))
+		}
+		for k, v := range want {
+			if got[k] != v {
+				t.Errorf("%s/%s: system --%s = %q, want %q", theme, mode, k, got[k], v)
+			}
+		}
+	}
+	for _, th := range Themes {
+		for _, mode := range []string{"dark", "light"} {
+			if th.ID == "clawsh" && mode == "dark" {
+				continue // the :root default
+			}
+			if !found[th.ID+"/"+mode] {
+				t.Errorf("no system-mode block for %s/%s", th.ID, mode)
+			}
+		}
+	}
+}

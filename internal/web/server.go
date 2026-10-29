@@ -180,7 +180,8 @@ func writeErr(w http.ResponseWriter, code int, err error) {
 }
 
 // applyLook writes the chosen theme onto <html> and the matching color-scheme
-// meta, so the first paint already has the right colours.
+// meta, so the first paint already has the right colours. It matches those two
+// lines of static/index.html literally; TestIndexLook fails if they change.
 func applyLook(page []byte, theme, mode string) []byte {
 	scheme := mode
 	if mode == "system" {
