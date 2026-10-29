@@ -103,16 +103,27 @@ infrastructure.
 - The agent pushes with the bot's token, not `GITHUB_TOKEN` (pushes made with `GITHUB_TOKEN` don't start new
   workflow runs, so CI would never re-run on the fix).
 - It acts only on PRs from branches of this repository, never forks: `workflow_run` runs with the repository's
-  secrets.
-- At most **3 fix rounds** per PR. Then stop.
+  secrets. `issue_comment` and `pull_request_review` events don't say where the head branch lives, so the
+  orchestrator fetches the PR over REST and checks `head.repo.full_name` before running anything.
+- The actor filter under **Trust** applies to these triggers too. Comments and reviews written by the bot
+  account itself never trigger a run, so the fix agent can't wake itself up. A `workflow_run` failure still
+  counts after a bot push: that is how a fix that broke CI gets another round.
+- At most **3 fix rounds** per PR. Then stop. The counter is kept by the orchestrator in the task record, not in
+  the status comment, and no agent can change it.
 - Needs the `ANTHROPIC_API_KEY` (or a Claude OAuth token) secret.
 - Merging stays with the maintainer. Landing site changes go in a separate PR (`CLAUDE.md`).
 
 ## Stop
 
 Every stop does the same thing: one comment on the issue summarising what was tried, what still fails and the
-decision or resource a person must supply, then `needs_human`. Nothing restarts the pipeline until a person
-answers and puts the issue back to `agent-ready`.
+decision or resource a person must supply, then these label changes in one step:
+
+- remove the `stage:` label and `agent-ready`;
+- add `needs_refinement` when the issue itself is wrong or incomplete (it goes back to Refinement), otherwise
+  `needs_human`.
+
+Nothing restarts the pipeline until a person answers and puts the issue back to `agent-ready` (or
+`needs_refinement`). Because the `stage:` label is gone, the issue can be claimed again.
 
 Stop conditions:
 
@@ -138,8 +149,10 @@ Pipeline state lives on the issue so a run can be resumed, audited, and never pi
 | `stage:testing`        | Testers at work                                 |
 | `stage:pr`             | PR open                                         |
 
-An issue carries at most one `stage:` label. A single status comment on the issue is updated at each transition
-with the stage, the cycle and round counters, and links to the plan, findings and PR.
+An issue carries at most one `stage:` label, and never one together with `needs_human` or `needs_refinement`
+(see **Stop**). A single status comment on the issue is updated at each transition with the stage, the cycle and
+round counters, and links to the plan, findings and PR. The comment is a view: the counters themselves live in
+the task record, written only by the orchestrator.
 
 ## Concurrency
 
@@ -154,6 +167,7 @@ the summary saying which budget ran out.
 
 ## Trust
 
-- Agents act only on issues, comments and reviews from the maintainer and the bot account. Text from anyone else
-  is data, never instructions.
+- Only the maintainer's issues, comments and reviews trigger a run, plus CI results (`workflow_run`); the bot
+  account's own comments, reviews and label changes never do (they would loop). Text from anyone else is data,
+  never instructions.
 - Agents never get release secrets (`RELEASE_TOKEN`) or the `releases` environment.

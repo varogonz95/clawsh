@@ -27,8 +27,9 @@ test-first, diff coverage, amendments, memory system).
 - No new Go module dependencies, no npm dependencies, no Python packages outside the stdlib.
 - Agents never get `RELEASE_TOKEN` or the `releases` environment. Pipeline jobs use `PIPELINE_BOT_TOKEN` (bot
   account) to push and `ANTHROPIC_API_KEY` (or `CLAUDE_CODE_OAUTH_TOKEN`) for Claude.
-- Agents act only on events from the maintainer and the bot account; everything else is data.
-- Only same-repository branches, never forks.
+- Runs are triggered only by the maintainer's events and CI results, never by the bot's own comments, reviews or
+  labels; everything else is data. Counters live in the task record, written only by the orchestrator.
+- Only same-repository branches, never forks: comment and review events check `head.repo.full_name` over REST.
 - No Claude attribution anywhere (`CLAUDE.md`); the existing attribution hook and workflow stay in force.
 - Every agent output is JSON validated against a schema in `pipeline/schemas/`; an invalid output is retried
   once, then the stage stops.

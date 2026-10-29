@@ -99,8 +99,9 @@ These apply to every `agent-ready` issue; the issue body doesn't need to repeat 
 - Stay inside **Scope**. Found something else? Open a new issue labelled `needs_refinement`; don't widen the PR.
 - Don't add dependencies the issue doesn't allow.
 - Never skip, disable or loosen a test to get green.
-- Blocked or the issue turns out wrong? Stop, comment on the issue with the exact question, swap `agent-ready`
-  for `needs_refinement`, and don't open a half-done PR.
+- Blocked or the issue turns out wrong? Stop, comment on the issue with the exact question, remove `agent-ready`
+  and any `stage:` label, add `needs_refinement` if the issue itself is wrong or incomplete or `needs_human`
+  otherwise (the **Stop** section of [`sdlc-pipeline.md`](sdlc-pipeline.md)), and don't open a half-done PR.
 
 ## Rules for the refinement agent
 
