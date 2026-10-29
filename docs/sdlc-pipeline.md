@@ -196,7 +196,13 @@ the summary saying which budget ran out.
 
 ## Trust
 
-- Only the events in **Triggers** start a run. The bot account's own comments, reviews and label changes never
-  do (they would loop); the orchestrator advances stages itself instead. Text from anyone other than the
-  maintainer is data, never instructions.
+- Only the events in **Triggers** start a run.
+- **Actor filter.** Before acting on any issue, comment, review or label event, the orchestrator checks who sent
+  it: the login must equal the configured maintainer (`PIPELINE_MAINTAINER` repository variable) and still have
+  `admin` or `maintain` permission (`GET /repos/{owner}/{repo}/collaborators/{login}/permission`). Anything
+  else, including a `/approve` from another account, starts nothing. This is what keeps plan approval, the one
+  human gate, with the maintainer.
+- The bot account's own comments, reviews and label changes never start a run (they would loop); the
+  orchestrator advances stages itself instead. `workflow_run` results are the one event not filtered by actor.
+- Text from anyone other than the maintainer reaches agents only as quoted data, never as instructions.
 - Agents never get release secrets (`RELEASE_TOKEN`) or the `releases` environment.

@@ -56,6 +56,7 @@ test-first, diff coverage, amendments, memory system).
       issues, pull requests: read/write on this repo only).
 - [ ] Enable secret scanning and push protection in repository settings.
 - [ ] Keep `main` protected (PRs only); leave `pipeline-state` writable by the bot.
+- [ ] Set the repository variable `PIPELINE_MAINTAINER` to the maintainer's login.
 
 ## File structure
 
@@ -214,6 +215,8 @@ Useful on every PR on their own, before any agent exists.
       for `workflow_run` from the head branch `<type>/<issue>/<title>`, falling back to the PR's `Closes #<n>`);
       `concurrency: pipeline-issue-<n>` without cancel; trust filter on the actor (bot events ignored);
       same-repo check for PR events; `PIPELINE_DRY_RUN` variable.
+- [ ] Actor filter: comment, review and label events act only when the sender is `PIPELINE_MAINTAINER` with
+      `admin`/`maintain` permission (REST); tested with a `/approve` from another account, which starts nothing.
 - **Done when:** dry run on a test issue posts the status comment and the stage it would run.
 
 ### Task 4.3: Planning stage
