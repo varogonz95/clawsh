@@ -6,7 +6,7 @@
 // visual redesign is a CSS change. The fallbacks match the original theme.
 const rootStyle = getComputedStyle(document.documentElement);
 function cssVar(name, fallback) { return rootStyle.getPropertyValue(name).trim() || fallback; }
-const HOST_COLORS = cssVar('--host-colors', '#6a9cf2, #f0b43c, #52c27f, #e8875a, #b48cf0, #4fc1c9').split(',').map((c) => c.trim());
+const hostColors = () => cssVar('--host-colors', '#6a9cf2, #f0b43c, #52c27f, #e8875a, #b48cf0, #4fc1c9').split(',').map((c) => c.trim());
 const AUTH_ERROR = 'access key rejected'; // hub.ErrMsgAuth
 const CLOSE_NOT_FOUND = 4404; // web.closeNotFound
 const CLOSE_UNREACHABLE = 4502; // web.closeUnreachable
@@ -129,7 +129,8 @@ function icon(name, label) {
 function hostColor(name) {
   const hosts = state.overview ? state.overview.hosts : [];
   const i = hosts.findIndex((x) => x.name === name);
-  return HOST_COLORS[Math.max(i, 0) % HOST_COLORS.length];
+  const cols = hostColors();
+  return cols[Math.max(i, 0) % cols.length];
 }
 
 function tile(name, online) {
@@ -765,17 +766,39 @@ function copyText(v, text) {
   }
 }
 
+const ANSI_NAMES = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
+  'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite'];
+
+// termTheme reads the --term-* tokens of the current theme; a missing token
+// keeps xterm's default.
+function termTheme() {
+  const st = getComputedStyle(document.documentElement);
+  const get = (n, d) => st.getPropertyValue(n).trim() || d;
+  const theme = {
+    background: get('--term-bg', '#0a0f14'),
+    foreground: get('--term-fg', '#d9e2ea'),
+    cursor: get('--term-cursor', get('--term-fg', '#d9e2ea')),
+    selectionBackground: get('--term-selection', '#2b4a6e'),
+  };
+  const ansi = get('--term-ansi', '').split(',').map((c) => c.trim()).filter(Boolean);
+  if (ansi.length === ANSI_NAMES.length) ANSI_NAMES.forEach((n, i) => { theme[n] = ansi[i]; });
+  return theme;
+}
+
+// With appearance "system" the OS can flip light/dark while a terminal is open.
+if (document.documentElement.dataset.mode === 'system') {
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (state.view && state.view.term) state.view.term.options.theme = termTheme();
+    render(); // host tile colours are inlined at render time
+  });
+}
+
 function openSession(host, id) {
   const term = new Terminal({
     fontFamily: cssVar('--term-font', '"JetBrains Mono", ui-monospace, monospace'),
     fontSize: 14,
     cursorBlink: true,
-    theme: {
-      background: cssVar('--term-bg', '#0a0f14'),
-      foreground: cssVar('--term-fg', '#d9e2ea'),
-      cursor: cssVar('--term-fg', '#d9e2ea'),
-      selectionBackground: cssVar('--term-selection', '#2b4a6e'),
-    },
+    theme: termTheme(),
   });
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
