@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Cross-machine manager for Claude Code sessions. Go 1.22, single binary with two roles: `clawsh agent` (runs on each machine, owns `claude` processes in PTYs, serves REST + WebSocket) and the hub commands (`hosts`, `ls`, `new`, `attach`, `kill`) run from any terminal. Plan and milestone status: `docs/PLAN.md` (M0/M1 done, M2 partly done, M3 status via hooks next).
 
+## Communication
+
+- Always reply in caveman mode: the [caveman skill](https://github.com/JuliusBrussee/caveman) (`claude plugin marketplace add JuliusBrussee/caveman`, then `claude plugin install caveman@caveman`). Without the skill, write the same way: drop articles, filler and hedging; keep technical terms, code, paths, commands and numbers exact.
+- Chat replies only. Files, commits, PRs, issues, comments and reviews stay in normal prose.
+- Switch back to normal sentences for security warnings and before destructive or hard-to-reverse actions.
+
 ## Layout
 
 - `cmd/clawsh` — CLI entrypoint; all subcommands (agent + hub side) in one `main.go`.
