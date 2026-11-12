@@ -30,27 +30,38 @@ func Attach(ctx context.Context, c *Client, id string) error {
 	return attach(ctx, c, id, os.Stdin, os.Stdout)
 }
 
+// AttachExit is Attach that also reports the session's exit code. The code is
+// nil when the user detached or the connection ended without one.
+func AttachExit(ctx context.Context, c *Client, id string) (*int, error) {
+	return attachExit(ctx, c, id, os.Stdin, os.Stdout)
+}
+
 func attach(ctx context.Context, c *Client, id string, stdin, stdout *os.File) error {
+	_, err := attachExit(ctx, c, id, stdin, stdout)
+	return err
+}
+
+func attachExit(ctx context.Context, c *Client, id string, stdin, stdout *os.File) (*int, error) {
 	inFd, outFd := int(stdin.Fd()), int(stdout.Fd())
 	if !term.IsTerminal(inFd) || !term.IsTerminal(outFd) {
-		return errors.New("attach needs an interactive terminal")
+		return nil, errors.New("attach needs an interactive terminal")
 	}
 	in, err := newCancelReader(stdin)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer in.Close()
 
 	conn, err := c.Dial(ctx, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	restoreConsole := prepareConsole(stdout)
 	oldState, err := term.MakeRaw(inFd)
 	if err != nil {
 		restoreConsole()
 		conn.Close()
-		return err
+		return nil, err
 	}
 
 	// teardown leaves nothing running once Attach returns, so a caller that
@@ -150,7 +161,7 @@ func attach(ctx context.Context, c *Client, id string, stdin, stdout *os.File) e
 	case <-inputDone:
 		if !detached {
 			teardown()
-			return inputErr
+			return nil, inputErr
 		}
 		// WriteControl is safe alongside a writer holding wmu, and has its own
 		// deadline, so a stuck connection can't hang the detach.
@@ -159,21 +170,21 @@ func attach(ctx context.Context, c *Client, id string, stdin, stdout *os.File) e
 			time.Now().Add(time.Second))
 		teardown()
 		fmt.Fprintf(stdout, "\r\n[detached from %s/%s]\r\n", c.Host.Name, id)
-		return nil
+		return nil, nil
 	case res = <-done:
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 
 	teardown()
 	if res.exitCode != nil {
 		fmt.Fprintf(stdout, "\r\n[session %s/%s exited with code %d]\r\n", c.Host.Name, id, *res.exitCode)
-		return nil
+		return res.exitCode, nil
 	}
 	if websocket.IsCloseError(res.err, websocket.CloseNormalClosure) {
-		return nil
+		return nil, nil
 	}
-	return fmt.Errorf("connection lost: %w", res.err)
+	return nil, fmt.Errorf("connection lost: %w", res.err)
 }
 
 // pumpInput forwards r to send until the user presses DetachKey (detached is
