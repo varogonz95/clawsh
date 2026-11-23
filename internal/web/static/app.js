@@ -625,8 +625,11 @@ function openNewDialog(opts) {
   const browser = h('div', { class: 'browser', id: 'ns-browser', hidden: true });
   const browseBtn = h('button', { type: 'button', class: 'btn ghost icon-btn', 'aria-label': 'Browse folders', title: 'Browse folders', 'aria-expanded': 'false', 'aria-controls': 'ns-browser' }, icon('folderOpen'));
   let browseSeq = 0;
+  let listed = false; // a folder listing is on screen, so a failed step keeps it
+  const browseErr = h('p', { class: 'form-error', role: 'alert', hidden: true });
   function closeBrowser() {
     browseSeq++;
+    listed = false;
     browser.hidden = true;
     browser.replaceChildren();
     browseBtn.setAttribute('aria-expanded', 'false');
@@ -641,11 +644,15 @@ function openNewDialog(opts) {
     } catch (e) {
       if (seq !== browseSeq) return;
       if (fallbackHome && path) { browse('', false); return; } // typed folder is not valid: start at home
-      browser.replaceChildren(h('p', { class: 'form-error', role: 'alert' }, e.message));
+      browseErr.textContent = e.message || 'Cannot read this folder';
+      browseErr.hidden = false;
+      if (!listed) browser.replaceChildren(browseErr); // first load failed: nothing to keep
       return;
     }
     if (seq !== browseSeq) return;
-    const kids = [h('div', { class: 'browser-path mono small', title: res.path }, res.path)];
+    browseErr.hidden = true;
+    listed = true;
+    const kids = [browseErr, h('div', { class: 'browser-path mono small', title: res.path }, res.path)];
     const list = [];
     if (res.parent) list.push(h('button', { type: 'button', class: 'browser-item mono', onclick: () => browse(res.parent) }, '.. Up'));
     const join = (n) => (res.path.endsWith('/') || res.path.endsWith('\\') ? res.path : res.path + (res.path.includes('\\') && !res.path.includes('/') ? '\\' : '/')) + n;
