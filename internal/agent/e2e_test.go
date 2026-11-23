@@ -305,3 +305,78 @@ func TestRecentDirsEndpoint(t *testing.T) {
 		t.Fatalf("disabled body = %s", body)
 	}
 }
+
+func TestWorkspaceFile(t *testing.T) {
+	m := agent.NewManager(agent.Options{Command: "/bin/sh"})
+	defer m.Shutdown()
+	srv := httptest.NewServer(agent.NewServer(m, "secret").Handler())
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	c := hub.NewClient(hub.Host{Name: "t", URL: srv.URL, Token: "secret"})
+
+	// omitted or false: no file
+	plain := t.TempDir()
+	if _, err := c.Create(ctx, api.CreateRequest{Dir: plain}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(plain, ".clawsh")); !os.IsNotExist(err) {
+		t.Fatalf("marker without workspace: %v", err)
+	}
+
+	// true: written once with the documented content
+	dir := filepath.Join(t.TempDir(), `we"ird\dir`)
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Create(ctx, api.CreateRequest{Dir: dir, Workspace: true}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, ".clawsh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "# clawsh workspace\nversion = 1\nname = \"we\\\"ird\\\\dir\"\n"; string(got) != want {
+		t.Fatalf("content %q, want %q", got, want)
+	}
+	if fi, _ := os.Stat(filepath.Join(dir, ".clawsh")); fi.Mode().Perm() != 0o644 && os.Getuid() != 0 {
+		t.Fatalf("mode %v", fi.Mode())
+	}
+
+	// existing file is untouched
+	custom := t.TempDir()
+	path := filepath.Join(custom, ".clawsh")
+	if err := os.WriteFile(path, []byte("mine\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Create(ctx, api.CreateRequest{Dir: custom, Workspace: true}); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != "mine\n" {
+		t.Fatalf("existing file changed: %q", b)
+	}
+}
+
+func TestWorkspaceReadOnlyFolderStillStarts(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	m := agent.NewManager(agent.Options{Command: "/bin/sh"})
+	defer m.Shutdown()
+	srv := httptest.NewServer(agent.NewServer(m, "secret").Handler())
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	c := hub.NewClient(hub.Host{Name: "t", URL: srv.URL, Token: "secret"})
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, 0o755) })
+	if _, err := c.Create(ctx, api.CreateRequest{Dir: dir, Workspace: true}); err != nil {
+		t.Fatalf("session should start: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".clawsh")); !os.IsNotExist(err) {
+		t.Fatalf("marker written in read-only folder: %v", err)
+	}
+}

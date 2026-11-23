@@ -82,6 +82,9 @@ type CreateRequest struct {
 	Args []string `json:"args,omitempty"` // extra args for claude, e.g. ["--resume"]
 	Cols int      `json:"cols,omitempty"`
 	Rows int      `json:"rows,omitempty"`
+	// Workspace asks the agent to mark Dir as a clawsh workspace by writing a
+	// .clawsh file in it, once; an existing file is never touched.
+	Workspace bool `json:"workspace,omitempty"`
 }
 
 // External is a Claude Code session the agent does not own: claude was

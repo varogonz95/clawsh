@@ -366,9 +366,10 @@ func runNew(args []string) error {
 	dir := fs.String("dir", "", "working directory on the remote machine (default: remote home)")
 	name := fs.String("name", "", "session name (default: dir basename)")
 	detached := fs.Bool("detached", false, "don't attach after creating")
+	workspace := fs.Bool("workspace", false, "mark the folder as a clawsh workspace (writes .clawsh once)")
 	pos, claudeArgs := parseInterspersed(fs, args)
 	if len(pos) != 1 {
-		return errors.New("usage: clawsh new <host> [--dir d] [--name n] [--detached] [-- claude args...]")
+		return errors.New("usage: clawsh new <host> [--dir d] [--name n] [--workspace] [--detached] [-- claude args...]")
 	}
 	cfg, err := hub.LoadConfig(*cfgPath)
 	if err != nil {
@@ -378,7 +379,7 @@ func runNew(args []string) error {
 	if err != nil {
 		return err
 	}
-	req := api.CreateRequest{Name: *name, Dir: *dir, Args: claudeArgs}
+	req := api.CreateRequest{Name: *name, Dir: *dir, Args: claudeArgs, Workspace: *workspace}
 	if cols, rows, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
 		req.Cols, req.Rows = cols, rows
 	}

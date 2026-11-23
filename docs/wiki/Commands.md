@@ -56,6 +56,7 @@ Alias: `list`. Lists sessions on every host, or just one. Columns: `TARGET`, `NA
 | `--dir` | remote user's home | Working directory on the remote machine; `~` is expanded there |
 | `--name` | basename of `--dir` | Session name shown in `ls` |
 | `--detached` | off | Create without attaching |
+| `--workspace` | off | Mark the folder as a clawsh workspace: the agent writes a `.clawsh` file (TOML: `version`, `name`) in it the first time; an existing file is never touched |
 
 The session starts at your current terminal size.
 

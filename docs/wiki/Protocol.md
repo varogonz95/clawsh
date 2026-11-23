@@ -18,7 +18,7 @@ Failures return `401` with `{"error":"unauthorized"}`. All errors use `{"error":
 |---|---|---|
 | `GET` | `/v1/health` | `{"host","os","version"}`; no auth |
 | `GET` | `/v1/sessions` | Array of sessions, oldest first |
-| `POST` | `/v1/sessions` | Create a session |
+| `POST` | `/v1/sessions` | Create a session. Body: `name`, `dir`, `args`, `cols`, `rows`, `workspace` (bool: write a `.clawsh` marker file in `dir` unless one exists; a write failure is logged and does not fail the session) |
 | `DELETE` | `/v1/sessions/{id}` | Stop and remove a session |
 | `GET` | `/v1/sessions/{id}/attach` | WebSocket upgrade |
 | `GET` | `/v1/dirs/recent` | `{"dirs":[...]}`: folders sessions were started in, most recent first (at most 20), without folders that no longer exist; `[]` when the agent keeps no history |

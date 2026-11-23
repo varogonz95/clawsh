@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -86,7 +88,30 @@ func (m *Manager) Create(req api.CreateRequest) (*Session, error) {
 	m.sessions[id] = s
 	m.mu.Unlock()
 	m.history.record(dir)
+	if req.Workspace {
+		markWorkspace(dir)
+	}
 	return s, nil
+}
+
+// markWorkspace writes the .clawsh marker in dir unless it already exists. A
+// failure (e.g. a read-only folder) is logged and never fails the session.
+func markWorkspace(dir string) {
+	f, err := os.OpenFile(filepath.Join(dir, ".clawsh"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		if !errors.Is(err, fs.ErrExist) {
+			log.Printf("workspace marker in %s: %v", dir, err)
+		}
+		return
+	}
+	name := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(filepath.Base(dir))
+	_, err = fmt.Fprintf(f, "# clawsh workspace\nversion = 1\nname = \"%s\"\n", name)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		log.Printf("workspace marker in %s: %v", dir, err)
+	}
 }
 
 // RecentDirs lists the folders sessions were started in, most recent first,

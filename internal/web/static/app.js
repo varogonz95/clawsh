@@ -12,6 +12,7 @@ const CLOSE_NOT_FOUND = 4404; // web.closeNotFound
 const CLOSE_UNREACHABLE = 4502; // web.closeUnreachable
 const KEY_STORE = 'clawsh_key';
 const SIDEBAR_STORE = 'clawsh.sidebar'; // 'open' | 'closed'
+const WORKSPACE_STORE = 'clawsh.workspaceMark'; // '1' | '0': the new-session workspace checkbox
 const NARROW = '(max-width: 900px)'; // the sessions panel starts collapsed and overlays the terminal
 
 // takeKey moves the access key from the opened link (?k=…) into
@@ -597,6 +598,12 @@ function openNewDialog(opts) {
     if (title && !nameEdited) nameInput.value = nextName(name, n);
   };
   const recent = h('div', { class: 'recent', hidden: true });
+  let wsChecked = false;
+  try { wsChecked = localStorage.getItem(WORKSPACE_STORE) === '1'; } catch (_) { /* storage blocked: unchecked */ }
+  const wsBox = h('input', { id: 'ns-workspace', name: 'workspace', type: 'checkbox', checked: wsChecked });
+  wsBox.addEventListener('change', () => {
+    try { localStorage.setItem(WORKSPACE_STORE, wsBox.checked ? '1' : '0'); } catch (_) { /* storage blocked */ }
+  });
   let recentSeq = 0;
   // loadRecent shows the machine's recent folders; any failure just hides the list.
   const loadRecent = async (name) => {
@@ -624,7 +631,11 @@ function openNewDialog(opts) {
     h('div', { class: 'field' },
       h('label', { for: 'ns-dir' }, 'Folder'),
       h('input', { id: 'ns-dir', name: 'dir', class: 'input mono', placeholder: '~', autocomplete: 'off', value: dir }),
-      dirHelp, recent),
+      dirHelp, recent,
+      h('label', { class: 'check', for: 'ns-workspace' },
+        wsBox,
+        h('span', {}, 'Mark this folder as a workspace')),
+      h('p', { class: 'small muted' }, 'Creates a .clawsh file in the folder the first time.')),
     h('div', { class: 'field' },
       h('label', { for: 'ns-name' }, 'Name ', h('span', { class: 'muted' }, '(optional)')),
       nameInput),
@@ -698,6 +709,7 @@ async function submitNew(form, err, submit, onCreated) {
     const s = await api('POST', `/api/hosts/${encodeURIComponent(host)}/sessions`, {
       name: text('name') || undefined,
       dir: text('dir') || undefined,
+      workspace: data.get('workspace') ? true : undefined,
       args: args.length ? args : undefined,
       cols: size.cols,
       rows: size.rows,
