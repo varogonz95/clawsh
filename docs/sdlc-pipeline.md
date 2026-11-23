@@ -112,6 +112,13 @@ infrastructure.
 - At most **3 fix rounds** per PR. Then stop. The counter is kept by the orchestrator in the task record, not in
   the status comment, and no agent can change it.
 - Needs the `ANTHROPIC_API_KEY` (or a Claude OAuth token) secret.
+- **Review fixes** are done by `.github/workflows/review-fix.yml`: a submitted review, inline review comment or PR
+  comment from the maintainer or from `claude[bot]` (the reviewer in `claude.yml`) starts the bot account
+  (`varogonz95-claudebot`). It reads the repo (`CLAUDE.md`, `docs/`), the issue the PR closes, the PR and all its
+  comments, fixes what is real, runs `make vet` and `make test`, and pushes to the PR branch with the secret
+  `CLAWSH_BOT_TOKEN` (so CI re-runs). Maintainer comments are the ask; `claude[bot]` findings are verified before
+  acting. Same-repo PRs only, 3 successful rounds per PR (then a stop comment), and the bot's own events never
+  start a run. Needs `CLAUDE_CODE_OAUTH_TOKEN` and `CLAWSH_BOT_TOKEN`.
 - Merging stays with the maintainer. Landing site changes go in a separate PR (`CLAUDE.md`).
 
 ## Stop
