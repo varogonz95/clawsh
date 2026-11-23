@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -378,5 +379,111 @@ func TestWorkspaceReadOnlyFolderStillStarts(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".clawsh")); !os.IsNotExist(err) {
 		t.Fatalf("marker written in read-only folder: %v", err)
+	}
+}
+
+func TestListDirs(t *testing.T) {
+	m := agent.NewManager(agent.Options{Command: "/bin/sh"})
+	defer m.Shutdown()
+	srv := httptest.NewServer(agent.NewServer(m, "secret").Handler())
+	defer srv.Close()
+
+	root := t.TempDir()
+	for _, d := range []string{"beta", "Alpha", ".hidden", "gamma/inner"} {
+		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "file.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "beta"), filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+
+	get := func(path, token string) (int, []byte) {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/v1/dirs/list?path="+url.QueryEscape(path), nil)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, b
+	}
+	list := func(path string) api.DirList {
+		code, b := get(path, "secret")
+		if code != 200 {
+			t.Fatalf("%q: %d %s", path, code, b)
+		}
+		var out api.DirList
+		if err := json.Unmarshal(b, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	got := list(root)
+	if want := []string{".hidden", "Alpha", "beta", "gamma", "link"}; !reflect.DeepEqual(got.Dirs, want) {
+		t.Fatalf("dirs = %v, want %v", got.Dirs, want)
+	}
+	if got.Path != root || got.Parent != filepath.Dir(root) {
+		t.Fatalf("path/parent = %q/%q", got.Path, got.Parent)
+	}
+	if empty := list(filepath.Join(root, "beta")); empty.Dirs == nil || len(empty.Dirs) != 0 {
+		t.Fatalf("empty folder dirs = %#v, want []", empty.Dirs)
+	}
+	if code, b := get(filepath.Join(root, "beta"), "secret"); code != 200 || !strings.Contains(string(b), `"dirs":[]`) {
+		t.Fatalf("empty folder JSON: %d %s", code, b)
+	}
+	if fs := list("/"); fs.Parent != "" || fs.Path != "/" {
+		t.Fatalf("root: %+v", fs)
+	}
+
+	// home: empty, "~" and "~/sub"
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if err := os.Mkdir(filepath.Join(home, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(home, "sub", "deep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"", "~"} {
+		if g := list(p); g.Path != home || !reflect.DeepEqual(g.Dirs, []string{"sub"}) {
+			t.Fatalf("%q: %+v", p, g)
+		}
+	}
+	if g := list("~/sub"); g.Path != filepath.Join(home, "sub") || !reflect.DeepEqual(g.Dirs, []string{"deep"}) {
+		t.Fatalf("~/sub: %+v", g)
+	}
+
+	// errors
+	if code, _ := get(filepath.Join(root, "missing"), "secret"); code != 400 {
+		t.Fatalf("missing: %d, want 400", code)
+	}
+	if code, _ := get(filepath.Join(root, "file.txt"), "secret"); code != 400 {
+		t.Fatalf("file: %d, want 400", code)
+	}
+	if code, _ := get(root, ""); code != 401 {
+		t.Fatalf("no token: %d, want 401", code)
+	}
+}
+
+func TestListDirsUnreadable(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	dir := filepath.Join(t.TempDir(), "locked")
+	if err := os.Mkdir(dir, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, 0o755) })
+	if _, code, err := agent.ListDirs(dir); err == nil || code != http.StatusForbidden {
+		t.Fatalf("got %d %v, want 403", code, err)
 	}
 }

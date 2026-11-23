@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,5 +198,46 @@ func TestCreateForwardsWorkspace(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".clawsh")); err != nil {
 		t.Fatalf("workspace field not forwarded: %v", err)
+	}
+}
+
+func TestListDirsProxy(t *testing.T) {
+	m := agent.NewManager(agent.Options{Command: "/bin/sh", HistoryFile: filepath.Join(t.TempDir(), "recent-dirs.json")})
+	srv := httptest.NewServer(agent.NewServer(m, "tok").Handler())
+	t.Cleanup(func() { srv.Close(); m.Shutdown() })
+	cfg := filepath.Join(t.TempDir(), "hosts.toml")
+	writeHosts(t, cfg, testHost{"a", srv.URL, "tok"})
+	_, base := startServer(t, cfg)
+	c := login(t, base)
+
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "one"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "f"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	get := func(client *http.Client, host, path string) (int, string) {
+		resp, err := client.Get(base + "/api/hosts/" + host + "/dirs/list?path=" + url.QueryEscape(path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, strings.TrimSpace(string(b))
+	}
+	code, got := get(c, "a", root)
+	want, _ := json.Marshal(api.DirList{Path: root, Parent: filepath.Dir(root), Dirs: []string{"one"}})
+	if code != 200 || got != string(want) {
+		t.Fatalf("got %d %s, want %s", code, got, want)
+	}
+	if code, body := get(c, "a", filepath.Join(root, "f")); code != 400 || !strings.Contains(body, "not a directory") {
+		t.Fatalf("file: %d %s, want 400 relayed", code, body)
+	}
+	if code, _ := get(c, "nope", root); code != http.StatusNotFound {
+		t.Fatalf("unknown host: %d, want 404", code)
+	}
+	if code, _ := get(&http.Client{}, "a", root); code != http.StatusUnauthorized {
+		t.Fatalf("no access key: %d, want 401", code)
 	}
 }

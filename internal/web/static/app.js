@@ -83,6 +83,7 @@ const ICONS = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  folderOpen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 18V6a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2"/><path d="M3 18l2.6-7.2A2 2 0 0 1 7.5 9.5H21a1 1 0 0 1 .96 1.28L19.6 18.4A2 2 0 0 1 17.7 20H5a2 2 0 0 1-2-2z"/></svg>',
   folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
   panel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>',
@@ -616,7 +617,51 @@ function openNewDialog(opts) {
     if (seq !== recentSeq || !newDialog) return;
     renderRecent(recent, dirs, document.getElementById('ns-dir'));
   };
-  const pick = (n) => { setHelp(n); loadRecent(n); };
+  const pick = (n) => { setHelp(n); loadRecent(n); closeBrowser(); };
+
+  // The folder browser: a panel under the folder input that lists the
+  // subfolders of a folder on the chosen machine (never files).
+  const dirInput = h('input', { id: 'ns-dir', name: 'dir', class: 'input mono', placeholder: '~', autocomplete: 'off', value: dir });
+  const browser = h('div', { class: 'browser', id: 'ns-browser', hidden: true });
+  const browseBtn = h('button', { type: 'button', class: 'btn ghost icon-btn', 'aria-label': 'Browse folders', title: 'Browse folders', 'aria-expanded': 'false', 'aria-controls': 'ns-browser' }, icon('folderOpen'));
+  let browseSeq = 0;
+  function closeBrowser() {
+    browseSeq++;
+    browser.hidden = true;
+    browser.replaceChildren();
+    browseBtn.setAttribute('aria-expanded', 'false');
+  }
+  const browse = async (path, fallbackHome) => {
+    const host = new FormData(form).get('host');
+    if (!host) return;
+    const seq = ++browseSeq;
+    let res;
+    try {
+      res = await api('GET', `/api/hosts/${encodeURIComponent(host)}/dirs/list?path=${encodeURIComponent(path)}`);
+    } catch (e) {
+      if (seq !== browseSeq) return;
+      if (fallbackHome && path) { browse('', false); return; } // typed folder is not valid: start at home
+      browser.replaceChildren(h('p', { class: 'form-error', role: 'alert' }, e.message));
+      return;
+    }
+    if (seq !== browseSeq) return;
+    const kids = [h('div', { class: 'browser-path mono small', title: res.path }, res.path)];
+    const list = [];
+    if (res.parent) list.push(h('button', { type: 'button', class: 'browser-item mono', onclick: () => browse(res.parent) }, '.. Up'));
+    const join = (n) => (res.path.endsWith('/') || res.path.endsWith('\\') ? res.path : res.path + (res.path.includes('\\') && !res.path.includes('/') ? '\\' : '/')) + n;
+    for (const d of res.dirs || []) list.push(h('button', { type: 'button', class: 'browser-item mono', onclick: () => browse(join(d)) }, d));
+    if (!list.length) list.push(h('p', { class: 'small muted' }, 'No subfolders.'));
+    kids.push(h('div', { class: 'browser-list' }, list));
+    kids.push(h('button', { type: 'button', class: 'btn small primary', onclick: () => { dirInput.value = res.path; closeBrowser(); dirInput.focus(); } }, 'Use this folder'));
+    browser.replaceChildren(...kids);
+  };
+  browseBtn.addEventListener('click', () => {
+    if (!browser.hidden) { closeBrowser(); return; }
+    browser.hidden = false;
+    browseBtn.setAttribute('aria-expanded', 'true');
+    browser.replaceChildren(h('p', { class: 'small muted' }, 'Loading...'));
+    browse(dirInput.value.trim(), true);
+  });
 
   const form = h('form', { class: 'dialog-body', onsubmit: (e) => { e.preventDefault(); submitNew(form, err, submit, onCreated); } },
     h('div', {},
@@ -630,8 +675,8 @@ function openNewDialog(opts) {
       offlineNote ? h('p', { class: 'small muted' }, offlineNote) : null),
     h('div', { class: 'field' },
       h('label', { for: 'ns-dir' }, 'Folder'),
-      h('input', { id: 'ns-dir', name: 'dir', class: 'input mono', placeholder: '~', autocomplete: 'off', value: dir }),
-      dirHelp, recent,
+      h('div', { class: 'input-row' }, dirInput, browseBtn),
+      browser, dirHelp, recent,
       h('label', { class: 'check', for: 'ns-workspace' },
         wsBox,
         h('span', {}, 'Mark this folder as a workspace')),

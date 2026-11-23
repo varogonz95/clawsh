@@ -75,6 +75,29 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 // relayErr passes an agent's status and message through (except 401/403,
 // which become 502); anything else
 // (unreachable agent, timeout) becomes 502.
+func (s *Server) listDirs(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.client(w, r)
+	if !ok {
+		return
+	}
+	out, err := c.ListDirs(r.Context(), r.URL.Query().Get("path"))
+	if err != nil {
+		// The agent answers a bad token with 401, so its 403 means an
+		// unreadable folder: relay it instead of reporting a rejected token.
+		var he *hub.HTTPError
+		if errors.As(err, &he) && he.Code == http.StatusForbidden {
+			writeErr(w, http.StatusForbidden, errors.New(he.Msg))
+			return
+		}
+		relayErr(w, err)
+		return
+	}
+	if out.Dirs == nil {
+		out.Dirs = []string{}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func relayErr(w http.ResponseWriter, err error) {
 	var he *hub.HTTPError
 	if errors.As(err, &he) {
