@@ -266,6 +266,7 @@ func splitTarget(t string) (host, id string, err error) {
 func runHosts(args []string) error {
 	fs, cfgPath := hubFlags("hosts")
 	parseInterspersed(fs, args)
+	ensureDefaultLocalConfig(*cfgPath)
 	cfg, err := hub.LoadConfig(*cfgPath)
 	if err != nil {
 		return err
@@ -290,6 +291,7 @@ func runHosts(args []string) error {
 func runList(args []string) error {
 	fs, cfgPath := hubFlags("ls")
 	pos, _ := parseInterspersed(fs, args)
+	ensureDefaultLocalConfig(*cfgPath)
 	cfg, err := hub.LoadConfig(*cfgPath)
 	if err != nil {
 		return err
@@ -367,6 +369,7 @@ func runNew(args []string) error {
 	name := fs.String("name", "", "session name (default: dir basename)")
 	detached := fs.Bool("detached", false, "don't attach after creating")
 	pos, claudeArgs := parseInterspersed(fs, args)
+	ensureDefaultLocalConfig(*cfgPath)
 	if len(pos) != 1 {
 		return errors.New("usage: clawsh new <host> [--dir d] [--name n] [--detached] [-- claude args...]")
 	}
@@ -397,6 +400,7 @@ func runNew(args []string) error {
 func runAttach(args []string) error {
 	fs, cfgPath := hubFlags("attach")
 	pos, _ := parseInterspersed(fs, args)
+	ensureDefaultLocalConfig(*cfgPath)
 	if len(pos) != 1 {
 		return errors.New("usage: clawsh attach <host>/<id>")
 	}
@@ -418,6 +422,7 @@ func runAttach(args []string) error {
 func runKill(args []string) error {
 	fs, cfgPath := hubFlags("kill")
 	pos, _ := parseInterspersed(fs, args)
+	ensureDefaultLocalConfig(*cfgPath)
 	if len(pos) != 1 {
 		return errors.New("usage: clawsh kill <host>/<id>")
 	}
@@ -449,6 +454,7 @@ func runWeb(args []string) error {
 	theme := fs.String("theme", web.DefaultTheme, "web UI theme: clawsh, vscode or ayu")
 	appearance := fs.String("appearance", web.DefaultAppearance, "web UI appearance: dark, light or system")
 	parseInterspersed(fs, args)
+	ensureDefaultLocalConfig(*cfgPath)
 	// web.New checks again; failing here is before the listener is opened.
 	if _, _, err := web.ResolveLook(*theme, *appearance); err != nil {
 		return err

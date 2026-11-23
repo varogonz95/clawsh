@@ -31,13 +31,14 @@ token = "paste-token-from-laptop"
 - `token` is the output of `clawsh token` on that machine.
 - `url` must start with `http://` or `https://`.
 - On start, `clawsh agent` creates this file (mode `0600`) with one host named `local` when it doesn't exist. Its `url` comes from `--listen`: an empty, `0.0.0.0` or `::` host becomes `localhost`, anything else is used as is (`--listen 192.168.1.20:7420` gives `http://192.168.1.20:7420`). An existing file is never modified, so after rotating the token update it yourself. Delete the `local` block if you don't want it.
+- The hub commands (`hosts`, `ls`, `new`, `attach`, `kill`, `web`) also create it when it doesn't exist at the default path, before any agent has run: one `local` host at `http://localhost:7420` with the token from `agent.token` (created if missing, so the agent reuses it when it first starts). The host stays unreachable until `clawsh agent` (or the plugin) runs on this machine. An explicit `--config` path that doesn't exist is never created. If your agent uses a different `--listen` or `--token-file`, edit the entry.
 - `clawsh web` can edit this file for you (Machines page). When it saves, it re-encodes the file: comments and formatting are lost, and the previous contents are kept in `hosts.toml.bak` (mode `0600`).
 
 A template lives at `hosts.example.toml` in the repo.
 
 ## `agent.token` (agent)
 
-A 64-character hex token, generated on the agent's first run and written with mode `0600`. Delete it and restart the agent to rotate; then update `hosts.toml` everywhere. Use `--token-file` to keep it elsewhere.
+A 64-character hex token, generated on the agent's first run (or by the first hub command on a fresh install) and written with mode `0600`. Delete it and restart the agent to rotate; then update `hosts.toml` everywhere. Use `--token-file` to keep it elsewhere.
 
 ## `recent-dirs.json` (agent)
 

@@ -16,7 +16,7 @@ clawsh token
 
 ## 2. Tell the hub about your agents
 
-On the machine running the agent there's nothing to do: if `hosts.toml` doesn't exist yet, the agent creates it with a `local` host (this agent's URL and token), so `clawsh ls`, `clawsh attach local/<id>` and `clawsh web` work right away. An existing file is never changed.
+On the machine running the agent there's nothing to do: if `hosts.toml` doesn't exist yet, the agent creates it with a `local` host (this agent's URL and token), so `clawsh ls`, `clawsh attach local/<id>` and `clawsh web` work right away. The hub commands (`hosts`, `ls`, `new`, `attach`, `kill`, `web`) do the same on a fresh install, even before the agent has ever run: they create `hosts.toml` and the agent token, and the `local` host (`http://localhost:7420`) shows as unreachable until `clawsh agent` (or the plugin) runs on that machine, which then reuses that token. An existing file is never changed.
 
 To drive other machines, on the machine you drive from, run `clawsh help` to see the config path (it ends in `clawsh/hosts.toml`), then create that file:
 
