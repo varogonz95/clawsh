@@ -201,6 +201,8 @@ legend { padding: 0; margin-bottom: 10px; font-weight: 600; }
 .machine-name { font-weight: 600; }
 .field { display: flex; flex-direction: column; gap: 8px; }
 .field label { font-weight: 600; }
+.field label.check { display: flex; align-items: center; gap: 8px; font-weight: 400; cursor: pointer; }
+.field label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
 .input { min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--rule-strong); background: var(--ground); color: var(--ink); font: inherit; }
 .input.mono { font: 14px var(--mono); }
 .recent { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }

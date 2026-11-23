@@ -177,3 +177,22 @@ func TestStaticSessionsPanel(t *testing.T) {
 		t.Error("app.css does not style .sessions-panel")
 	}
 }
+
+// The new-session dialog remembers the workspace checkbox under a fixed key
+// and sends the field to the API.
+func TestNewDialogWorkspaceCheckbox(t *testing.T) {
+	_, base := startServer(t, noHosts(t))
+	c := login(t, base)
+	resp, err := c.Get(base + "/static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	js := string(b)
+	for _, want := range []string{"'clawsh.workspaceMark'", "id: 'ns-workspace'", "workspace: data.get('workspace')", "Mark this folder as a workspace", "Creates a .clawsh file in the folder the first time."} {
+		if !strings.Contains(js, want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+}

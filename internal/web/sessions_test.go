@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -172,5 +173,29 @@ func TestRecentDirsProxy(t *testing.T) {
 	}
 	if code, _ := get(base + "/api/hosts/nope/dirs/recent"); code != http.StatusNotFound {
 		t.Fatalf("unknown host: %d, want 404", code)
+	}
+}
+
+func TestCreateForwardsWorkspace(t *testing.T) {
+	m := agent.NewManager(agent.Options{Command: "/bin/sh", HistoryFile: filepath.Join(t.TempDir(), "recent-dirs.json")})
+	srv := httptest.NewServer(agent.NewServer(m, "tok").Handler())
+	t.Cleanup(func() { srv.Close(); m.Shutdown() })
+	cfg := filepath.Join(t.TempDir(), "hosts.toml")
+	writeHosts(t, cfg, testHost{"a", srv.URL, "tok"})
+	_, base := startServer(t, cfg)
+	c := login(t, base)
+
+	dir := t.TempDir()
+	body, _ := json.Marshal(api.CreateRequest{Dir: dir, Workspace: true})
+	resp, err := c.Post(base+"/api/hosts/a/sessions", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create: %d", resp.StatusCode)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".clawsh")); err != nil {
+		t.Fatalf("workspace field not forwarded: %v", err)
 	}
 }
