@@ -64,7 +64,7 @@ jobs:
 
           [ "$ACTOR" != "$BOT_LOGIN" ] || stop false "own event, skipping"
           if [ "$ACTOR" != "claude[bot]" ] && { [ -z "$MAINTAINER" ] || [ "$ACTOR" != "$MAINTAINER" ]; }; then
-            go false "$ACTOR is not the maintainer or the reviewer bot"
+            stop false "$ACTOR is not the maintainer or the reviewer bot"
           fi
           # A bare approval carries nothing to fix.
           [ "$REVIEW_STATE" != "approved" ] || stop false "approval, nothing to fix"
