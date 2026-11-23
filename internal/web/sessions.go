@@ -72,9 +72,7 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// relayErr passes an agent's status and message through (except 401/403,
-// which become 502); anything else
-// (unreachable agent, timeout) becomes 502.
+// listDirs proxies the agent's folder listing for the web UI's folder browser.
 func (s *Server) listDirs(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.client(w, r)
 	if !ok {
@@ -98,6 +96,9 @@ func (s *Server) listDirs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// relayErr passes an agent's status and message through (except 401/403,
+// which become 502); anything else
+// (unreachable agent, timeout) becomes 502.
 func relayErr(w http.ResponseWriter, err error) {
 	var he *hub.HTTPError
 	if errors.As(err, &he) {
