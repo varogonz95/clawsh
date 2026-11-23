@@ -76,6 +76,15 @@ type RecentDirs struct {
 	Dirs []string `json:"dirs"` // absolute paths, most recent first; never null
 }
 
+// DirList answers GET /v1/dirs/list?path=<p>: the immediate subfolders of one
+// folder on the agent's machine, for a folder picker. Only folder names are
+// returned, never files.
+type DirList struct {
+	Path   string   `json:"path"`   // absolute, resolved folder ("" or "~" in the query is the home folder)
+	Parent string   `json:"parent"` // its parent; "" at a filesystem root
+	Dirs   []string `json:"dirs"`   // subfolder names, sorted case-insensitively, at most 1000; never null
+}
+
 type CreateRequest struct {
 	Name string   `json:"name,omitempty"`
 	Dir  string   `json:"dir,omitempty"`  // defaults to the agent user's home; "~" is expanded on the agent

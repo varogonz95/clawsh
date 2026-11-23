@@ -22,6 +22,7 @@ Failures return `401` with `{"error":"unauthorized"}`. All errors use `{"error":
 | `DELETE` | `/v1/sessions/{id}` | Stop and remove a session |
 | `GET` | `/v1/sessions/{id}/attach` | WebSocket upgrade |
 | `GET` | `/v1/dirs/recent` | `{"dirs":[...]}`: folders sessions were started in, most recent first (at most 20), without folders that no longer exist; `[]` when the agent keeps no history |
+| `GET` | `/v1/dirs/list?path=<p>` | `{"path":...,"parent":...,"dirs":[...]}`: the immediate subfolders of one folder, for a folder picker. `path` empty or `~` is the agent user's home, `~/x` is expanded. `path` is the absolute folder, `parent` its parent (`""` at a filesystem root), `dirs` the subfolder names (not paths; dot-folders and symlinks to folders included, files never), sorted case-insensitively, at most 1000, never null. 400 if the path does not exist or is not a folder, 403 if it is unreadable |
 | `GET` | `/v1/external` | Array of external sessions, oldest first |
 | `PUT` | `/v1/external/{id}` | Announce or renew an external session |
 | `DELETE` | `/v1/external/{id}` | Withdraw an external session |

@@ -196,3 +196,22 @@ func TestNewDialogWorkspaceCheckbox(t *testing.T) {
 		}
 	}
 }
+
+// The dialog's folder browser button is icon-only with an accessible name and
+// talks to the dirs/list route.
+func TestNewDialogFolderBrowser(t *testing.T) {
+	_, base := startServer(t, noHosts(t))
+	c := login(t, base)
+	resp, err := c.Get(base + "/static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	js := string(b)
+	for _, want := range []string{"'aria-label': 'Browse folders'", "title: 'Browse folders'", "/dirs/list?path=", "'Use this folder'", "'.. Up'"} {
+		if !strings.Contains(js, want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+}

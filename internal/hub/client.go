@@ -49,6 +49,12 @@ func (c *Client) RecentDirs(ctx context.Context) (api.RecentDirs, error) {
 	return out, c.do(ctx, http.MethodGet, "/v1/dirs/recent", nil, &out)
 }
 
+// ListDirs lists the subfolders of path on the agent's machine ("" is its home).
+func (c *Client) ListDirs(ctx context.Context, path string) (api.DirList, error) {
+	var out api.DirList
+	return out, c.do(ctx, http.MethodGet, "/v1/dirs/list?path="+url.QueryEscape(path), nil, &out)
+}
+
 func (c *Client) Externals(ctx context.Context) ([]api.External, error) {
 	var out []api.External
 	return out, c.do(ctx, http.MethodGet, "/v1/external", nil, &out)
